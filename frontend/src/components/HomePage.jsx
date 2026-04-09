@@ -79,6 +79,8 @@ export default function HomePage() {
   const handleCardClick = (project) => {
     if (project.id === 'finance') {
       navigate('/finance')
+    } else if (project.id === 'psychology') {
+      navigate('/psychology')
     } else {
       navigate(`/project/${project.id}`)
     }
