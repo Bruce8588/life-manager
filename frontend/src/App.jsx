@@ -1,0 +1,18 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import HomePage from './components/HomePage'
+import ProjectPage from './components/ProjectPage'
+import FinancePage from './components/FinancePage'
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/project/:id" element={<ProjectPage />} />
+      <Route path="/finance" element={<FinancePage />} />
+      <Route path="/trading" element={<Navigate to="http://localhost:3000" />} />
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
+  )
+}
+
+export default App
