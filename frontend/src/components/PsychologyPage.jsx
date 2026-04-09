@@ -6,7 +6,7 @@ export default function PsychologyPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+    <div className="min-h-screen" style={{ background: '#000000' }}>
       <div className="p-6 md:p-12">
         <button
           onClick={() => navigate('/')}
