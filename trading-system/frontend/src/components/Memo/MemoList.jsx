@@ -5,13 +5,17 @@ const API = '/api'
 
 export default function MemoList() {
   const [memos, setMemos] = useState([])
+  const [logicGroups, setLogicGroups] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [editContent, setEditContent] = useState('')
+  const [editGroupId, setEditGroupId] = useState(null)
   const [newContent, setNewContent] = useState('')
+  const [newGroupId, setNewGroupId] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
 
   useEffect(() => {
     fetchMemos()
+    fetchLogicGroups()
   }, [])
 
   const fetchMemos = async () => {
@@ -24,15 +28,26 @@ export default function MemoList() {
     }
   }
 
+  const fetchLogicGroups = async () => {
+    try {
+      const res = await fetch(`${API}/logic-groups`)
+      const data = await res.json()
+      setLogicGroups(data)
+    } catch (err) {
+      console.error('Failed to fetch logic groups:', err)
+    }
+  }
+
   const handleCreate = async () => {
     if (!newContent.trim()) return
     try {
       await fetch(`${API}/memos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newContent })
+        body: JSON.stringify({ content: newContent, logic_group_id: newGroupId })
       })
       setNewContent('')
+      setNewGroupId(null)
       setShowEditor(false)
       fetchMemos()
     } catch (err) {
@@ -45,10 +60,11 @@ export default function MemoList() {
       await fetch(`${API}/memos/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: editContent })
+        body: JSON.stringify({ content: editContent, logic_group_id: editGroupId })
       })
       setEditingId(null)
       setEditContent('')
+      setEditGroupId(null)
       fetchMemos()
     } catch (err) {
       console.error('Failed to update memo:', err)
@@ -68,6 +84,13 @@ export default function MemoList() {
   const startEdit = (memo) => {
     setEditingId(memo.id)
     setEditContent(memo.content)
+    setEditGroupId(memo.logic_group_id)
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditContent('')
+    setEditGroupId(null)
   }
 
   const formatDate = (dateStr) => {
@@ -94,6 +117,19 @@ export default function MemoList() {
       {/* New memo editor */}
       {showEditor && (
         <div className="mb-6 bg-slate-800 rounded-lg p-4 border border-slate-700">
+          <div className="mb-3">
+            <label className="block text-sm text-slate-400 mb-1">分组</label>
+            <select
+              value={newGroupId ?? ''}
+              onChange={(e) => setNewGroupId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full bg-slate-700 text-white rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">全局叙事（无分组）</option>
+              {logicGroups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
           <textarea
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
@@ -103,7 +139,7 @@ export default function MemoList() {
           />
           <div className="flex justify-end gap-2 mt-3">
             <button
-              onClick={() => { setShowEditor(false); setNewContent('') }}
+              onClick={() => { setShowEditor(false); setNewContent(''); setNewGroupId(null) }}
               className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
             >
               取消
@@ -125,6 +161,19 @@ export default function MemoList() {
           <div key={memo.id} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
             {editingId === memo.id ? (
               <>
+                <div className="mb-3">
+                  <label className="block text-sm text-slate-400 mb-1">分组</label>
+                  <select
+                    value={editGroupId ?? ''}
+                    onChange={(e) => setEditGroupId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full bg-slate-700 text-white rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">全局叙事（无分组）</option>
+                    {logicGroups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
@@ -133,7 +182,7 @@ export default function MemoList() {
                 />
                 <div className="flex justify-end gap-2 mt-3">
                   <button
-                    onClick={() => { setEditingId(null); setEditContent('') }}
+                    onClick={cancelEdit}
                     className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
                   >
                     取消
@@ -149,7 +198,17 @@ export default function MemoList() {
               </>
             ) : (
               <>
-                <p className="text-slate-200 whitespace-pre-wrap">{memo.content}</p>
+                <div className="flex items-start gap-3">
+                  {memo.logic_group && (
+                    <span
+                      className="mt-1 shrink-0 px-2 py-0.5 text-xs font-medium rounded-full"
+                      style={{ backgroundColor: memo.logic_group.color + '30', color: memo.logic_group.color }}
+                    >
+                      {memo.logic_group.name}
+                    </span>
+                  )}
+                  <p className="text-slate-200 whitespace-pre-wrap flex-1">{memo.content}</p>
+                </div>
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-700">
                   <span className="text-sm text-slate-500">
                     {formatDate(memo.updated_at)}

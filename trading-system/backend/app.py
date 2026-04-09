@@ -24,8 +24,10 @@ class Memo(Base):
     __tablename__ = 'memos'
     id = Column(Integer, primary_key=True)
     content = Column(Text, nullable=False)
+    logic_group_id = Column(Integer, ForeignKey('logic_groups.id'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    logic_group = relationship('LogicGroup', foreign_keys=[logic_group_id])
 
 class LogicGroup(Base):
     __tablename__ = 'logic_groups'
@@ -87,6 +89,15 @@ class MarketEntry(Base):
 # Create tables
 Base.metadata.create_all(engine)
 
+# Migration: add logic_group_id column to memos if not exists
+from sqlalchemy import inspect, text
+inspector = inspect(engine)
+columns = [c['name'] for c in inspector.get_columns('memos')]
+if 'logic_group_id' not in columns:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE memos ADD COLUMN logic_group_id INTEGER REFERENCES logic_groups(id)"))
+        conn.commit()
+
 # ============== API Routes ==============
 
 # --- Memos ---
@@ -94,7 +105,16 @@ Base.metadata.create_all(engine)
 def get_memos():
     session = Session()
     memos = session.query(Memo).order_by(Memo.updated_at.desc()).all()
-    result = [{'id': m.id, 'content': m.content, 'created_at': m.created_at.isoformat(), 'updated_at': m.updated_at.isoformat()} for m in memos]
+    result = []
+    for m in memos:
+        result.append({
+            'id': m.id,
+            'content': m.content,
+            'logic_group_id': m.logic_group_id,
+            'logic_group': {'id': m.logic_group.id, 'name': m.logic_group.name, 'color': m.logic_group.color} if m.logic_group else None,
+            'created_at': m.created_at.isoformat(),
+            'updated_at': m.updated_at.isoformat()
+        })
     session.close()
     return jsonify(result)
 
@@ -102,10 +122,17 @@ def get_memos():
 def create_memo():
     data = request.json
     session = Session()
-    memo = Memo(content=data['content'])
+    memo = Memo(content=data['content'], logic_group_id=data.get('logic_group_id'))
     session.add(memo)
     session.commit()
-    result = {'id': memo.id, 'content': memo.content, 'created_at': memo.created_at.isoformat(), 'updated_at': memo.updated_at.isoformat()}
+    result = {
+        'id': memo.id,
+        'content': memo.content,
+        'logic_group_id': memo.logic_group_id,
+        'logic_group': {'id': memo.logic_group.id, 'name': memo.logic_group.name, 'color': memo.logic_group.color} if memo.logic_group else None,
+        'created_at': memo.created_at.isoformat(),
+        'updated_at': memo.updated_at.isoformat()
+    }
     session.close()
     return jsonify(result), 201
 
@@ -115,9 +142,17 @@ def update_memo(id):
     session = Session()
     memo = session.query(Memo).get(id)
     if memo:
-        memo.content = data['content']
+        memo.content = data.get('content', memo.content)
+        memo.logic_group_id = data.get('logic_group_id', memo.logic_group_id)
         session.commit()
-        result = {'id': memo.id, 'content': memo.content, 'created_at': memo.created_at.isoformat(), 'updated_at': memo.updated_at.isoformat()}
+        result = {
+            'id': memo.id,
+            'content': memo.content,
+            'logic_group_id': memo.logic_group_id,
+            'logic_group': {'id': memo.logic_group.id, 'name': memo.logic_group.name, 'color': memo.logic_group.color} if memo.logic_group else None,
+            'created_at': memo.created_at.isoformat(),
+            'updated_at': memo.updated_at.isoformat()
+        }
         session.close()
         return jsonify(result)
     session.close()
