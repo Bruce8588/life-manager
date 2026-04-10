@@ -113,6 +113,19 @@ class RiskAlert(Base):
     is_read = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class TradingReview(Base):
+    __tablename__ = 'trading_reviews'
+    id = Column(Integer, primary_key=True)
+    stock_name = Column(String(100), nullable=False)
+    trade_date = Column(DateTime)
+    decision = Column(Text, nullable=False)
+    outcome = Column(String(20))
+    actual_profit_loss = Column(Float, default=0)
+    actual_exit_price = Column(Float, default=0)
+    reflection = Column(Text)
+    tags = Column(JSON)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 # Create tables
 Base.metadata.create_all(engine)
 
@@ -774,6 +787,72 @@ def delete_risk_alert(id):
     alert = session.query(RiskAlert).get(id)
     if alert:
         session.delete(alert)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Trading Reviews ---
+@app.route('/api/trading-reviews', methods=['GET'])
+def get_trading_reviews():
+    session = Session()
+    reviews = session.query(TradingReview).order_by(TradingReview.created_at.desc()).all()
+    result = [{
+        'id': r.id,
+        'stock_name': r.stock_name,
+        'trade_date': r.trade_date.isoformat() if r.trade_date else None,
+        'decision': r.decision,
+        'outcome': r.outcome,
+        'actual_profit_loss': r.actual_profit_loss,
+        'actual_exit_price': r.actual_exit_price,
+        'reflection': r.reflection,
+        'tags': r.tags or [],
+        'created_at': r.created_at.isoformat()
+    } for r in reviews]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/trading-reviews', methods=['POST'])
+def create_trading_review():
+    data = request.json
+    session = Session()
+    trade_date = None
+    if data.get('trade_date'):
+        trade_date = datetime.fromisoformat(data['trade_date'].replace('Z', '+00:00'))
+    review = TradingReview(
+        stock_name=data['stock_name'],
+        trade_date=trade_date,
+        decision=data['decision'],
+        outcome=data.get('outcome', ''),
+        actual_profit_loss=data.get('actual_profit_loss', 0),
+        actual_exit_price=data.get('actual_exit_price', 0),
+        reflection=data.get('reflection', ''),
+        tags=data.get('tags', [])
+    )
+    session.add(review)
+    session.commit()
+    result = {
+        'id': review.id,
+        'stock_name': review.stock_name,
+        'trade_date': review.trade_date.isoformat() if review.trade_date else None,
+        'decision': review.decision,
+        'outcome': review.outcome,
+        'actual_profit_loss': review.actual_profit_loss,
+        'actual_exit_price': review.actual_exit_price,
+        'reflection': review.reflection,
+        'tags': review.tags or [],
+        'created_at': review.created_at.isoformat()
+    }
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/trading-reviews/<int:id>', methods=['DELETE'])
+def delete_trading_review(id):
+    session = Session()
+    review = session.query(TradingReview).get(id)
+    if review:
+        session.delete(review)
         session.commit()
         session.close()
         return jsonify({'success': True})
