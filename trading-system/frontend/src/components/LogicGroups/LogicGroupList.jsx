@@ -280,10 +280,28 @@ export default function LogicGroupList() {
                       {groupStocks.map(s => (
                         <span
                           key={s.id}
-                          className="px-2 py-0.5 rounded text-xs"
+                          className="flex items-center gap-1 px-2 py-0.5 rounded text-xs group/tag"
                           style={{ backgroundColor: group.color + '30', color: group.color }}
                         >
                           {s.name}
+                          <button
+                            onClick={async () => {
+                              await fetch(`${API}/stocks/${s.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  name: s.name,
+                                  logic_group_id: null,
+                                  field_values: s.field_values || {},
+                                  notes: s.notes || ''
+                                })
+                              })
+                              fetchStocks()
+                            }}
+                            className="opacity-0 group-hover/tag:opacity-100 hover:opacity-100 text-red-300 hover:text-red-400 transition-opacity ml-1"
+                          >
+                            ×
+                          </button>
                         </span>
                       ))}
                     </div>
