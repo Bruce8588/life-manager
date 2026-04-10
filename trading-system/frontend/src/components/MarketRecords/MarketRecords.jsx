@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Save, Plus, Trash2, RefreshCw, Palette, StickyNote, Calculator } from 'lucide-react'
+import { Table, Plus, Trash2, RefreshCw, StickyNote, X } from 'lucide-react'
 
 const API = '/api'
 const TREND_COLUMNS = [
@@ -15,21 +15,45 @@ const TREND_COLUMNS = [
   { key: 'down_break', name: '下跌破坏', color: '#8b5cf6' },
 ]
 
-export default function MarketRecords() {
+export default function MarketRecords({ stockId, stockName, onBack }) {
   const [records, setRecords] = useState([])
+  const [stocks, setStocks] = useState([])
+  const [selectedStockId, setSelectedStockId] = useState(stockId || null)
   const [loading, setLoading] = useState(true)
-  const [editingCell, setEditingCell] = useState(null) // {recordId, trend, field: 'value'|'note'}
+  const [editingCell, setEditingCell] = useState(null)
   const [editValue, setEditValue] = useState('')
-  const [showNoteModal, setShowNoteModal] = useState(null) // {recordId, trend}
+  const [showNoteModal, setShowNoteModal] = useState(null)
 
   useEffect(() => {
-    fetchRecords()
+    fetchStocks()
   }, [])
+
+  useEffect(() => {
+    if (selectedStockId || stockId) {
+      fetchRecords()
+    }
+  }, [selectedStockId, stockId])
+
+  const fetchStocks = async () => {
+    try {
+      const res = await fetch(`${API}/stocks`)
+      const data = await res.json()
+      setStocks(data)
+      if (!selectedStockId && data.length > 0) {
+        setSelectedStockId(data[0].id)
+      }
+    } catch (err) {
+      console.error('Failed to fetch stocks:', err)
+    }
+  }
 
   const fetchRecords = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API}/market-records`)
+      const url = selectedStockId 
+        ? `${API}/market-records?stock_id=${selectedStockId}`
+        : `${API}/market-records`
+      const res = await fetch(url)
       const data = await res.json()
       setRecords(data)
     } catch (err) {
@@ -43,7 +67,11 @@ export default function MarketRecords() {
       const res = await fetch(`${API}/market-records`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: new Date().toISOString().split('T')[0] })
+        body: JSON.stringify({ 
+          stock_id: selectedStockId,
+          date: new Date().toISOString().split('T')[0],
+          data: {}
+        })
       })
       const newRecord = await res.json()
       setRecords([newRecord, ...records])
@@ -52,17 +80,20 @@ export default function MarketRecords() {
     }
   }
 
-  const updateCell = async (recordId, trend, field, value) => {
+  const updateCell = async (recordId, trend, value) => {
     const record = records.find(r => r.id === recordId)
     if (!record) return
 
-    const newData = { ...record.data, [trend]: { ...record.data?.[trend], [field]: value } }
+    const newData = { ...record.data, [trend]: { ...record.data?.[trend], value } }
     
     try {
       await fetch(`${API}/market-records/${recordId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: newData })
+        body: JSON.stringify({ 
+          stock_id: selectedStockId,
+          data: newData 
+        })
       })
       setRecords(records.map(r => r.id === recordId ? { ...r, data: newData } : r))
     } catch (err) {
@@ -81,7 +112,10 @@ export default function MarketRecords() {
       await fetch(`${API}/market-records/${recordId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: newData })
+        body: JSON.stringify({ 
+          stock_id: selectedStockId,
+          data: newData 
+        })
       })
       setRecords(records.map(r => r.id === recordId ? { ...r, data: newData } : r))
       setShowNoteModal(null)
@@ -91,7 +125,6 @@ export default function MarketRecords() {
   }
 
   const deleteRecord = async (id) => {
-    if (!confirm('确定删除这行记录？')) return
     try {
       await fetch(`${API}/market-records/${id}`, { method: 'DELETE' })
       setRecords(records.filter(r => r.id !== id))
@@ -100,17 +133,21 @@ export default function MarketRecords() {
     }
   }
 
-  // Calculate percentage change between two values
-  const calcPercent = (current, previous) => {
-    if (!current || !previous) return null
-    const diff = ((current - previous) / previous * 100).toFixed(1)
-    return diff
+  // Calculate percentage: current row's filled value vs previous row's filled value (any column)
+  const getPreviousFilledValue = (currentRecordIndex) => {
+    for (let i = currentRecordIndex + 1; i < records.length; i++) {
+      const record = records[i]
+      for (const trend of TREND_COLUMNS) {
+        const val = record.data?.[trend.key]?.value
+        if (val) return val
+      }
+    }
+    return null
   }
 
-  // Get previous non-null value in any trend column
-  const getPreviousValue = (currentRecordIndex, trend) => {
-    for (let i = currentRecordIndex + 1; i < records.length; i++) {
-      const val = records[i].data?.[trend]?.value
+  const getCurrentFilledValue = (record) => {
+    for (const trend of TREND_COLUMNS) {
+      const val = record.data?.[trend.key]?.value
       if (val) return val
     }
     return null
@@ -132,12 +169,29 @@ export default function MarketRecords() {
   return (
     <div className="max-w-full mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-3">
+          {onBack && (
+            <button onClick={onBack} className="p-2 bg-slate-700 rounded-lg text-slate-400 hover:text-white">
+              <X size={18} />
+            </button>
+          )}
           <Table className="text-indigo-400" size={28} />
           <h2 className="text-2xl font-bold text-white">行情记录</h2>
-          <span className="text-slate-500 text-sm">{records.length} 条记录</span>
         </div>
+        
+        {/* Stock Selector */}
+        <select
+          value={selectedStockId || ''}
+          onChange={(e) => setSelectedStockId(e.target.value ? parseInt(e.target.value) : null)}
+          className="bg-slate-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">所有股票</option>
+          {stocks.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+
         <div className="flex items-center gap-2">
           <button onClick={fetchRecords} className="p-2 bg-slate-700 rounded-lg text-slate-400 hover:text-white" title="刷新">
             <RefreshCw size={18} />
@@ -155,51 +209,64 @@ export default function MarketRecords() {
           <thead>
             <tr className="bg-slate-750">
               <th className="p-3 text-left text-sm font-medium text-slate-400 border border-slate-700 sticky left-0 bg-slate-750 z-10 min-w-[100px]">日期</th>
+              <th className="p-3 text-center text-sm font-medium text-slate-400 border border-slate-700 min-w-[80px]">涨跌%</th>
               {TREND_COLUMNS.map(col => (
-                <th key={col.key} className="p-3 text-center text-sm font-medium border border-slate-700 min-w-[100px]">
-                  <div className="flex flex-col items-center gap-1">
-                    <span style={{ color: col.color }}>{col.name}</span>
-                  </div>
+                <th key={col.key} className="p-3 text-center text-sm font-medium border border-slate-700 min-w-[90px]">
+                  <span style={{ color: col.color }}>{col.name}</span>
                 </th>
               ))}
-              <th className="p-3 text-center text-sm font-medium text-slate-400 border border-slate-700 w-10">删除</th>
+              <th className="p-3 text-center text-sm font-medium text-slate-400 border border-slate-700 w-10">删</th>
             </tr>
           </thead>
           <tbody>
-            {records.map((record, recordIndex) => (
-              <tr key={record.id} className="hover:bg-slate-700/50">
-                <td className="p-2 border border-slate-700 sticky left-0 bg-slate-800 z-10">
-                  <span className="text-white font-medium">{formatDate(record.date)}</span>
-                </td>
-                {TREND_COLUMNS.map(col => {
-                  const cellData = record.data?.[col.key] || {}
-                  const cellValue = cellData.value
-                  const cellColor = cellData.color
-                  const prevValue = getPreviousValue(recordIndex, col.key)
-                  const percentChange = cellValue && prevValue ? calcPercent(cellValue, prevValue) : null
+            {records.map((record, recordIndex) => {
+              const currentValue = getCurrentFilledValue(record)
+              const prevValue = getPreviousFilledValue(recordIndex)
+              const percentChange = currentValue && prevValue 
+                ? ((currentValue - prevValue) / prevValue * 100).toFixed(1)
+                : null
 
-                  return (
-                    <td
-                      key={col.key}
-                      className="p-1 border border-slate-700 relative"
-                      style={{ backgroundColor: cellColor ? `${cellColor}20` : 'transparent' }}
-                    >
-                      <div className="flex flex-col items-center">
-                        {/* Value input */}
-                        {editingCell?.recordId === record.id && editingCell?.trend === col.key && editingCell?.field === 'value' ? (
+              return (
+                <tr key={record.id} className="hover:bg-slate-700/50">
+                  <td className="p-2 border border-slate-700 sticky left-0 bg-slate-800 z-10">
+                    <span className="text-white font-medium">{formatDate(record.date)}</span>
+                  </td>
+                  {/* Percent change column */}
+                  <td className="p-2 border border-slate-700 text-center">
+                    {percentChange !== null ? (
+                      <span className={`font-medium ${parseFloat(percentChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {parseFloat(percentChange) >= 0 ? '↑' : '↓'} {Math.abs(percentChange)}%
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">-</span>
+                    )}
+                  </td>
+                  {/* Trend columns */}
+                  {TREND_COLUMNS.map(col => {
+                    const cellData = record.data?.[col.key] || {}
+                    const cellValue = cellData.value
+                    const cellColor = cellData.color
+
+                    return (
+                      <td
+                        key={col.key}
+                        className="p-1 border border-slate-700 relative"
+                        style={{ backgroundColor: cellColor ? `${cellColor}20` : 'transparent' }}
+                      >
+                        {editingCell?.recordId === record.id && editingCell?.trend === col.key ? (
                           <input
                             type="number"
                             step="0.01"
-                            className="w-full bg-slate-600 text-white rounded px-2 py-1 text-center text-sm focus:outline-none"
+                            className="w-full bg-slate-600 text-white rounded px-1 py-2 text-center text-sm focus:outline-none"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
                             onBlur={() => {
-                              updateCell(record.id, col.key, 'value', parseFloat(editValue) || null)
+                              updateCell(record.id, col.key, parseFloat(editValue) || null)
                               setEditingCell(null)
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
-                                updateCell(record.id, col.key, 'value', parseFloat(editValue) || null)
+                                updateCell(record.id, col.key, parseFloat(editValue) || null)
                                 setEditingCell(null)
                               }
                             }}
@@ -207,57 +274,41 @@ export default function MarketRecords() {
                           />
                         ) : (
                           <div
-                            className="w-full text-center py-1 cursor-pointer hover:bg-slate-600/50 rounded text-white"
-                            onClick={() => {
-                              setEditingCell({ recordId: record.id, trend: col.key, field: 'value' })
-                              setEditValue(cellValue || '')
-                            }}
+                            className="flex items-center justify-center gap-1"
                           >
-                            {cellValue || '-'}
+                            <span
+                              className="py-2 cursor-pointer hover:bg-slate-600/50 rounded w-full text-center text-white"
+                              onClick={() => {
+                                setEditingCell({ recordId: record.id, trend: col.key })
+                                setEditValue(cellValue || '')
+                              }}
+                            >
+                              {cellValue || '-'}
+                            </span>
+                            {cellData.note && (
+                              <button
+                                className="p-1 text-slate-400 hover:text-white"
+                                onClick={() => setShowNoteModal({ recordId: record.id, trend: col.key })}
+                              >
+                                <StickyNote size={12} />
+                              </button>
+                            )}
                           </div>
                         )}
-
-                        {/* Percentage indicator */}
-                        {percentChange !== null && (
-                          <span className={`text-xs ${parseFloat(percentChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {parseFloat(percentChange) >= 0 ? '↑' : '↓'} {Math.abs(percentChange)}%
-                          </span>
-                        )}
-
-                        {/* Note indicator */}
-                        {cellData.note && (
-                          <button
-                            className="text-xs text-slate-400 hover:text-white mt-1"
-                            onClick={() => setShowNoteModal({ recordId: record.id, trend: col.key })}
-                          >
-                            📝
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Cell actions */}
-                      <div className="absolute top-1 right-1 opacity-0 hover:opacity-100 flex gap-1">
-                        <button
-                          className="p-1 bg-slate-600 rounded text-xs hover:bg-slate-500"
-                          onClick={() => setShowNoteModal({ recordId: record.id, trend: col.key })}
-                          title="笔记"
-                        >
-                          <StickyNote size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  )
-                })}
-                <td className="p-2 border border-slate-700 text-center">
-                  <button
-                    onClick={() => deleteRecord(record.id)}
-                    className="p-1 text-slate-500 hover:text-red-400"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                      </td>
+                    )
+                  })}
+                  <td className="p-2 border border-slate-700 text-center">
+                    <button
+                      onClick={() => deleteRecord(record.id)}
+                      className="p-1 text-slate-500 hover:text-red-400"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
             {records.length === 0 && (
               <tr>
                 <td colSpan={12} className="p-8 text-center text-slate-500">
@@ -296,25 +347,20 @@ export default function MarketRecords() {
                       style={c ? { backgroundColor: c } : {}}
                       onClick={() => {
                         const textarea = document.getElementById('noteTextarea')
-                        const note = textarea.value
-                        updateNote(showNoteModal.recordId, showNoteModal.trend, note, c || null)
+                        updateNote(showNoteModal.recordId, showNoteModal.trend, textarea.value, c || null)
                       }}
                     />
                   ))}
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button
-                  onClick={() => setShowNoteModal(null)}
-                  className="px-4 py-2 text-slate-400 hover:text-white"
-                >
+                <button onClick={() => setShowNoteModal(null)} className="px-4 py-2 text-slate-400 hover:text-white">
                   取消
                 </button>
                 <button
                   onClick={() => {
                     const textarea = document.getElementById('noteTextarea')
-                    const note = textarea.value
-                    updateNote(showNoteModal.recordId, showNoteModal.trend, note, cellData.color || null)
+                    updateNote(showNoteModal.recordId, showNoteModal.trend, textarea.value, cellData.color || null)
                   }}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded"
                 >

@@ -500,16 +500,30 @@ export default function StockList({ initialGroupId = null, initialStockId = null
               <Trash2 size={16} />
               删除
             </button>
-            <button
-              onClick={() => {
-                // Quick add a custom field if none exist
-                if (customFields.length === 0) setShowFieldForm(true)
-              }}
-              className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white transition-colors"
-            >
-              <Settings size={16} />
-              {customFields.length === 0 ? '添加字段' : '管理字段'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  sessionStorage.setItem('__pending_records_stock_id__', stock.id)
+                  sessionStorage.setItem('__pending_records_stock_name__', stock.name)
+                  window.location.hash = 'records'
+                  // Trigger tab switch via parent if possible, otherwise reload
+                  const event = new CustomEvent('navigate_records', { detail: { stockId: stock.id, stockName: stock.name } })
+                  window.dispatchEvent(event)
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 rounded-lg transition-colors"
+              >
+                📊 行情记录
+              </button>
+              <button
+                onClick={() => {
+                  if (customFields.length === 0) setShowFieldForm(true)
+                }}
+                className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white transition-colors"
+              >
+                <Settings size={16} />
+                {customFields.length === 0 ? '添加字段' : '管理字段'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -133,8 +133,12 @@ class Decision(Base):
 class MarketRecord(Base):
     __tablename__ = 'market_records'
     id = Column(Integer, primary_key=True)
+    stock_id = Column(Integer, ForeignKey('stocks.id'))
     date = Column(String(20))  # YYYY-MM-DD
-    data = Column(JSON)  # {trend_key: {value: number, note: string, color: string}, ...}
+    trend = Column(String(20))  # which trend column: up, up_natural, etc.
+    value = Column(Float, default=0)
+    note = Column(Text)
+    color = Column(String(20))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -906,9 +910,14 @@ def delete_decision(id):
 @app.route('/api/market-records', methods=['GET'])
 def get_market_records():
     session = Session()
-    records = session.query(MarketRecord).order_by(MarketRecord.date.desc()).all()
+    stock_id = request.args.get('stock_id', type=int)
+    query = session.query(MarketRecord)
+    if stock_id:
+        query = query.filter_by(stock_id=stock_id)
+    records = query.order_by(MarketRecord.date.desc()).all()
     result = [{
         'id': r.id,
+        'stock_id': r.stock_id,
         'date': r.date,
         'data': r.data or {},
         'created_at': r.created_at.isoformat()
@@ -921,6 +930,7 @@ def create_market_record():
     data = request.json
     session = Session()
     record = MarketRecord(
+        stock_id=data.get('stock_id'),
         date=data.get('date', datetime.now().strftime('%Y-%m-%d')),
         data=data.get('data', {})
     )
@@ -928,6 +938,7 @@ def create_market_record():
     session.commit()
     result = {
         'id': record.id,
+        'stock_id': record.stock_id,
         'date': record.date,
         'data': record.data or {},
         'created_at': record.created_at.isoformat()
@@ -943,9 +954,11 @@ def update_market_record(id):
     if record:
         record.date = data.get('date', record.date)
         record.data = data.get('data', record.data)
+        record.stock_id = data.get('stock_id', record.stock_id)
         session.commit()
         result = {
             'id': record.id,
+            'stock_id': record.stock_id,
             'date': record.date,
             'data': record.data or {},
             'created_at': record.created_at.isoformat()

@@ -48,6 +48,17 @@ function App() {
     setActiveTab('stocks')
   }
 
+  // Listen for navigate_records event from StockList
+  useEffect(() => {
+    const handleNavigateRecords = (e) => {
+      sessionStorage.setItem('__pending_records_stock_id__', e.detail.stockId)
+      sessionStorage.setItem('__pending_records_stock_name__', e.detail.stockName)
+      setActiveTab('records')
+    }
+    window.addEventListener('navigate_records', handleNavigateRecords)
+    return () => window.removeEventListener('navigate_records', handleNavigateRecords)
+  }, [])
+
   // 保存页面顺序
   const savePageOrder = (newOrder) => {
     setPageOrder(newOrder)
@@ -101,7 +112,14 @@ function App() {
       case 'review':
         return <TradingReview />
       case 'records':
-        return <MarketRecords />
+        return <MarketRecords 
+          stockId={sessionStorage.getItem('__pending_records_stock_id__')} 
+          stockName={sessionStorage.getItem('__pending_records_stock_name__')}
+          onBack={() => {
+            sessionStorage.removeItem('__pending_records_stock_id__')
+            sessionStorage.removeItem('__pending_records_stock_name__')
+          }}
+        />
       case 'market':
       default:
         return <MarketInfoList />
