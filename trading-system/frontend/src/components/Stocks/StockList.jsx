@@ -84,7 +84,8 @@ export default function StockList({ initialGroupId = null, initialStockId = null
     const payload = {
       name: stockForm.name,
       code: stockForm.code || '',
-      logic_group_id: stockForm.logic_group_id || null
+      logic_group_id: stockForm.logic_group_id || null,
+      field_values: stockForm.field_values || {}
     }
     try {
       if (editingStockId) {
@@ -136,7 +137,9 @@ export default function StockList({ initialGroupId = null, initialStockId = null
         body: JSON.stringify({
           name: groupPickerStock.name,
           code: groupPickerStock.code || '',
-          logic_group_id: newGroupId
+          logic_group_id: newGroupId,
+          field_values: groupPickerStock.field_values || {},
+          notes: groupPickerStock.notes || ''
         })
       })
       setGroupPickerStock(null)
