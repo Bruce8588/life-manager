@@ -20,7 +20,6 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
   const [stocks, setStocks] = useState([])
   const [selectedStockId, setSelectedStockId] = useState(null)
   const [selectedGroupId, setSelectedGroupId] = useState(null)
-  const [openDropdown, setOpenDropdown] = useState(null)
   const [loading, setLoading] = useState(false)
   const [editingCell, setEditingCell] = useState(null)
   const [editValue, setEditValue] = useState('')
@@ -186,15 +185,18 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
 
   const handleStockSelect = (stockId) => {
     setSelectedStockId(stockId)
-    setOpenDropdown(null)
   }
 
-  const handleGroupSelect = (groupId, firstStockId) => {
+  const handleGroupSelect = (groupId) => {
     setSelectedGroupId(groupId)
-    if (firstStockId) {
-      setSelectedStockId(firstStockId)
+    // Auto-select first stock in group
+    if (groupId === null) {
+      // All stocks - select first
+      if (stocks.length > 0) setSelectedStockId(stocks[0].id)
+    } else {
+      const groupData = stocksByGroup[groupId]
+      if (groupData?.stocks.length > 0) setSelectedStockId(groupData.stocks[0].id)
     }
-    setOpenDropdown(null)
   }
 
   return (
@@ -226,68 +228,51 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
         </div>
       </div>
 
-      {/* Stock Selector - Horizontal */}
+      {/* Stock Selector - Two Row */}
       <div className="mb-4 bg-slate-800 rounded-lg border border-slate-700 p-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-slate-400 text-sm mr-2">股票：</span>
-
-          {/* All button */}
+        {/* Row 1: Groups */}
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <span className="text-slate-400 text-sm mr-2">分组：</span>
           <button
-            onClick={() => handleGroupSelect(null, stocks[0]?.id)}
+            onClick={() => handleGroupSelect(null)}
             className={`px-3 py-1.5 rounded text-sm ${!selectedGroupId ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
           >
-            全部 ({stocks.length})
+            全部
           </button>
-
-          {/* Group buttons */}
           {Object.entries(stocksByGroup).map(([groupId, group]) => {
             const isSelected = selectedGroupId === (groupId === 'ungrouped' ? null : parseInt(groupId))
             return (
-              <div key={groupId} className="relative">
-                <button
-                  onClick={() => {
-                    if (isSelected) {
-                      setOpenDropdown(openDropdown === groupId ? null : groupId)
-                    } else {
-                      const gid = groupId === 'ungrouped' ? null : parseInt(groupId)
-                      handleGroupSelect(gid, group.stocks[0]?.id)
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
-                  <span>{group.name}</span>
-                  <span className="text-xs opacity-70">({group.stocks.length})</span>
-                </button>
-
-                {/* Dropdown */}
-                {isSelected && openDropdown === groupId && (
-                  <div className="absolute top-full left-0 mt-1 bg-slate-700 rounded-lg border border-slate-600 p-2 min-w-[150px] z-20 shadow-lg">
-                    {group.stocks.map(stock => (
-                      <button
-                        key={stock.id}
-                        onClick={() => handleStockSelect(stock.id)}
-                        className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 ${
-                          selectedStockId === stock.id
-                            ? 'bg-indigo-600/50 text-indigo-200'
-                            : 'text-slate-300 hover:bg-slate-600'
-                        }`}
-                      >
-                        <span>{stock.name}</span>
-                        {stock.code && <span className="text-slate-500 text-xs">{stock.code}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <button
+                key={groupId}
+                onClick={() => handleGroupSelect(groupId === 'ungrouped' ? null : parseInt(groupId))}
+                className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
+                <span>{group.name}</span>
+              </button>
             )
           })}
         </div>
 
-        {/* Click outside to close dropdown */}
-        {openDropdown && (
-          <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
-        )}
+        {/* Row 2: Stocks in selected group */}
+        {selectedGroupId !== null || stocks.length > 0 ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-slate-400 text-sm mr-2">股票：</span>
+            {(selectedGroupId === null ? stocks : stocksByGroup[selectedGroupId]?.stocks || []).map(stock => (
+              <button
+                key={stock.id}
+                onClick={() => handleStockSelect(stock.id)}
+                className={`px-3 py-1.5 rounded text-sm ${
+                  selectedStockId === stock.id
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                {stock.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Current Stock */}
