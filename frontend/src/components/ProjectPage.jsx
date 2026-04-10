@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import PsychologyHub from './PsychologyHub'
 import BodyHub from './BodyHub'
+import { URLS } from '../config/urls'
 
 export default function ProjectPage() {
   const { id } = useParams()
@@ -64,7 +65,7 @@ export default function ProjectPage() {
           <div className="space-y-4">
             {/* 读书笔记卡片 */}
             <a
-              href="http://8.129.109.139:8975/reading/"
+              href={URLS.reading}
               target="_blank"
               rel="noopener noreferrer"
               className="block bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 group"

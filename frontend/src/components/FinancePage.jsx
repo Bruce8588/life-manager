@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, TrendingUp, Receipt } from 'lucide-react'
+import { URLS } from '../config/urls'
 
 export default function FinancePage() {
   const navigate = useNavigate()
@@ -20,7 +21,7 @@ export default function FinancePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* 投资 Card */}
           <button
-            onClick={() => window.open('http://8.129.109.139:4816/', '_blank')}
+            onClick={() => window.open(URLS.trading, '_blank')}
             className="bg-white rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 group"
           >
             <div className="flex flex-col items-center">

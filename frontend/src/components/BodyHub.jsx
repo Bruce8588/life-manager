@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ExternalLink, Utensils, Activity, Target, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { URLS } from '../config/urls'
 
 export default function BodyHub() {
   const navigate = useNavigate()
@@ -10,7 +11,7 @@ export default function BodyHub() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* 饮食追踪卡片 */}
         <a 
-          href="http://8.129.109.139:5001/"
+          href={URLS.diet}
           target="_blank"
           rel="noopener noreferrer"
           className="block bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl p-6 border border-orange-100 hover:shadow-lg hover:-translate-y-1 transition-all group"
