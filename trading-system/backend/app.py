@@ -24,10 +24,9 @@ class Memo(Base):
     __tablename__ = 'memos'
     id = Column(Integer, primary_key=True)
     content = Column(Text, nullable=False)
-    logic_group_id = Column(Integer, ForeignKey('logic_groups.id'), nullable=True)
+    logic_group_ids = Column(JSON, default=list)  # JSON array of logic group IDs
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    logic_group = relationship('LogicGroup', foreign_keys=[logic_group_id])
 
 class LogicGroup(Base):
     __tablename__ = 'logic_groups'
@@ -86,17 +85,51 @@ class MarketEntry(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class RiskRule(Base):
+    __tablename__ = 'risk_rules'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False)  # max_position_percent, max_total_exposure, etc.
+    value = Column(Float, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class RiskPosition(Base):
+    __tablename__ = 'risk_positions'
+    id = Column(Integer, primary_key=True)
+    symbol = Column(String(20), nullable=False)
+    name = Column(String(100), nullable=False)
+    price = Column(Float, default=0)
+    quantity = Column(Integer, default=0)
+    cost = Column(Float, default=0)
+    stop_loss = Column(Float, default=0)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class RiskAlert(Base):
+    __tablename__ = 'risk_alerts'
+    id = Column(Integer, primary_key=True)
+    alert_type = Column(String(20), default='warning')  # warning, danger, info
+    message = Column(Text, nullable=False)
+    is_read = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 # Create tables
 Base.metadata.create_all(engine)
 
-# Migration: add logic_group_id column to memos if not exists
+# Migration: add logic_group_ids column to memos if not exists
 from sqlalchemy import inspect, text
 inspector = inspect(engine)
 columns = [c['name'] for c in inspector.get_columns('memos')]
-if 'logic_group_id' not in columns:
-    with engine.connect() as conn:
-        conn.execute(text("ALTER TABLE memos ADD COLUMN logic_group_id INTEGER REFERENCES logic_groups(id)"))
-        conn.commit()
+if 'logic_group_ids' not in columns:
+    with engine.begin() as conn:
+        if 'logic_group_id' in columns:
+            conn.execute(text("ALTER TABLE memos ADD COLUMN logic_group_ids TEXT"))
+            results = conn.execute(text("SELECT id, logic_group_id FROM memos WHERE logic_group_id IS NOT NULL")).fetchall()
+            for row in results:
+                conn.execute(text("UPDATE memos SET logic_group_ids = :ids WHERE id = :id"),
+                             [{'ids': json.dumps([row.logic_group_id]), 'id': row.id}])
+        else:
+            conn.execute(text("ALTER TABLE memos ADD COLUMN logic_group_ids TEXT"))
 
 # ============== API Routes ==============
 
@@ -105,13 +138,20 @@ if 'logic_group_id' not in columns:
 def get_memos():
     session = Session()
     memos = session.query(Memo).order_by(Memo.updated_at.desc()).all()
+    # Fetch all logic groups once for resolving names/colors
+    all_groups = {g.id: g for g in session.query(LogicGroup).all()}
     result = []
     for m in memos:
+        ids = m.logic_group_ids or []
+        logic_groups = [
+            {'id': gid, 'name': all_groups[gid].name, 'color': all_groups[gid].color}
+            for gid in ids if gid in all_groups
+        ]
         result.append({
             'id': m.id,
             'content': m.content,
-            'logic_group_id': m.logic_group_id,
-            'logic_group': {'id': m.logic_group.id, 'name': m.logic_group.name, 'color': m.logic_group.color} if m.logic_group else None,
+            'logic_group_ids': ids,
+            'logic_groups': logic_groups,
             'created_at': m.created_at.isoformat(),
             'updated_at': m.updated_at.isoformat()
         })
@@ -122,14 +162,21 @@ def get_memos():
 def create_memo():
     data = request.json
     session = Session()
-    memo = Memo(content=data['content'], logic_group_id=data.get('logic_group_id'))
+    logic_group_ids = data.get('logic_group_ids', [])
+    memo = Memo(content=data['content'], logic_group_ids=logic_group_ids)
     session.add(memo)
     session.commit()
+    ids = memo.logic_group_ids or []
+    all_groups = {g.id: g for g in session.query(LogicGroup).all()}
+    logic_groups = [
+        {'id': gid, 'name': all_groups[gid].name, 'color': all_groups[gid].color}
+        for gid in ids if gid in all_groups
+    ]
     result = {
         'id': memo.id,
         'content': memo.content,
-        'logic_group_id': memo.logic_group_id,
-        'logic_group': {'id': memo.logic_group.id, 'name': memo.logic_group.name, 'color': memo.logic_group.color} if memo.logic_group else None,
+        'logic_group_ids': ids,
+        'logic_groups': logic_groups,
         'created_at': memo.created_at.isoformat(),
         'updated_at': memo.updated_at.isoformat()
     }
@@ -143,13 +190,20 @@ def update_memo(id):
     memo = session.query(Memo).get(id)
     if memo:
         memo.content = data.get('content', memo.content)
-        memo.logic_group_id = data.get('logic_group_id', memo.logic_group_id)
+        if 'logic_group_ids' in data:
+            memo.logic_group_ids = data['logic_group_ids']
         session.commit()
+        ids = memo.logic_group_ids or []
+        all_groups = {g.id: g for g in session.query(LogicGroup).all()}
+        logic_groups = [
+            {'id': gid, 'name': all_groups[gid].name, 'color': all_groups[gid].color}
+            for gid in ids if gid in all_groups
+        ]
         result = {
             'id': memo.id,
             'content': memo.content,
-            'logic_group_id': memo.logic_group_id,
-            'logic_group': {'id': memo.logic_group.id, 'name': memo.logic_group.name, 'color': memo.logic_group.color} if memo.logic_group else None,
+            'logic_group_ids': ids,
+            'logic_groups': logic_groups,
             'created_at': memo.created_at.isoformat(),
             'updated_at': memo.updated_at.isoformat()
         }
@@ -530,5 +584,201 @@ def delete_market_entry(id):
     session.close()
     return jsonify({'error': 'Not found'}), 404
 
+# --- Risk Rules ---
+@app.route('/api/risk-rules', methods=['GET'])
+def get_risk_rules():
+    session = Session()
+    rules = session.query(RiskRule).all()
+    result = {r.name: r.value for r in rules}
+    # Add defaults for any missing rules
+    defaults = {
+        'max_position_percent': 20,
+        'max_total_exposure': 80,
+        'stop_loss_percent': 8,
+        'max_drawdown': 15,
+        'daily_loss_limit': 5,
+    }
+    for k, v in defaults.items():
+        if k not in result:
+            result[k] = v
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/risk-rules', methods=['POST'])
+def save_risk_rules():
+    data = request.json
+    session = Session()
+    for name, value in data.items():
+        rule = session.query(RiskRule).filter_by(name=name).first()
+        if rule:
+            rule.value = value
+        else:
+            rule = RiskRule(name=name, value=value)
+            session.add(rule)
+    session.commit()
+    result = {r.name: r.value for r in session.query(RiskRule).all()}
+    session.close()
+    return jsonify(result)
+
+# --- Risk Positions ---
+@app.route('/api/risk-positions', methods=['GET'])
+def get_risk_positions():
+    session = Session()
+    positions = session.query(RiskPosition).all()
+    result = [{
+        'id': p.id,
+        'symbol': p.symbol,
+        'name': p.name,
+        'price': p.price,
+        'quantity': p.quantity,
+        'cost': p.cost,
+        'stop_loss': p.stop_loss,
+        'notes': p.notes,
+        'created_at': p.created_at.isoformat(),
+        'updated_at': p.updated_at.isoformat()
+    } for p in positions]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/risk-positions', methods=['POST'])
+def create_risk_position():
+    data = request.json
+    session = Session()
+    position = RiskPosition(
+        symbol=data.get('symbol', ''),
+        name=data['name'],
+        price=data.get('price', 0),
+        quantity=data.get('quantity', 0),
+        cost=data.get('cost', 0),
+        stop_loss=data.get('stop_loss', 0),
+        notes=data.get('notes', '')
+    )
+    session.add(position)
+    session.commit()
+    result = {
+        'id': position.id,
+        'symbol': position.symbol,
+        'name': position.name,
+        'price': position.price,
+        'quantity': position.quantity,
+        'cost': position.cost,
+        'stop_loss': position.stop_loss,
+        'notes': position.notes,
+        'created_at': position.created_at.isoformat(),
+        'updated_at': position.updated_at.isoformat()
+    }
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/risk-positions/<int:id>', methods=['PUT'])
+def update_risk_position(id):
+    data = request.json
+    session = Session()
+    position = session.query(RiskPosition).get(id)
+    if position:
+        position.symbol = data.get('symbol', position.symbol)
+        position.name = data.get('name', position.name)
+        position.price = data.get('price', position.price)
+        position.quantity = data.get('quantity', position.quantity)
+        position.cost = data.get('cost', position.cost)
+        position.stop_loss = data.get('stop_loss', position.stop_loss)
+        position.notes = data.get('notes', position.notes)
+        session.commit()
+        result = {
+            'id': position.id,
+            'symbol': position.symbol,
+            'name': position.name,
+            'price': position.price,
+            'quantity': position.quantity,
+            'cost': position.cost,
+            'stop_loss': position.stop_loss,
+            'notes': position.notes,
+            'created_at': position.created_at.isoformat(),
+            'updated_at': position.updated_at.isoformat()
+        }
+        session.close()
+        return jsonify(result)
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/risk-positions/<int:id>', methods=['DELETE'])
+def delete_risk_position(id):
+    session = Session()
+    position = session.query(RiskPosition).get(id)
+    if position:
+        session.delete(position)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Risk Alerts ---
+@app.route('/api/risk-alerts', methods=['GET'])
+def get_risk_alerts():
+    session = Session()
+    alerts = session.query(RiskAlert).order_by(RiskAlert.created_at.desc()).limit(50).all()
+    result = [{
+        'id': a.id,
+        'type': a.alert_type,
+        'message': a.message,
+        'is_read': bool(a.is_read),
+        'created_at': a.created_at.isoformat()
+    } for a in alerts]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/risk-alerts', methods=['POST'])
+def create_risk_alert():
+    data = request.json
+    session = Session()
+    alert = RiskAlert(
+        alert_type=data.get('type', 'warning'),
+        message=data['message']
+    )
+    session.add(alert)
+    session.commit()
+    result = {
+        'id': alert.id,
+        'type': alert.alert_type,
+        'message': alert.message,
+        'is_read': bool(alert.is_read),
+        'created_at': alert.created_at.isoformat()
+    }
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/risk-alerts/<int:id>', methods=['PUT'])
+def update_risk_alert(id):
+    data = request.json
+    session = Session()
+    alert = session.query(RiskAlert).get(id)
+    if alert:
+        alert.is_read = 1 if data.get('is_read', True) else 0
+        session.commit()
+        result = {
+            'id': alert.id,
+            'type': alert.alert_type,
+            'message': alert.message,
+            'is_read': bool(alert.is_read),
+            'created_at': alert.created_at.isoformat()
+        }
+        session.close()
+        return jsonify(result)
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/risk-alerts/<int:id>', methods=['DELETE'])
+def delete_risk_alert(id):
+    session = Session()
+    alert = session.query(RiskAlert).get(id)
+    if alert:
+        session.delete(alert)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5001)
