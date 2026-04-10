@@ -136,14 +136,14 @@ function App() {
         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Sidebar */}
+      {/* Sidebar - desktop: always in flow but toggleable; mobile: overlay */}
       <div className={`
-        fixed md:static inset-y-0 left-0 z-40
-        w-64 bg-slate-800 border-r border-slate-700
-        transform transition-transform duration-200 ease-in-out
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        flex-shrink-0 h-full bg-slate-800 border-r border-slate-700
+        transition-all duration-200 ease-in-out overflow-hidden
+        w-64 ${sidebarOpen ? 'md:w-64' : 'md:w-0 md:border-0'}
+        ${sidebarOpen ? 'w-64' : 'w-0 border-0'}
       `}>
-        <div className="p-6">
+        <div className={`p-6 w-64 ${!sidebarOpen ? 'md:hidden' : ''}`}>
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-xl font-bold text-indigo-400">交易系统</h1>
             <button
