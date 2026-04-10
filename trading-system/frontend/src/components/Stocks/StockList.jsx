@@ -16,6 +16,7 @@ export default function StockList({ initialGroupId = null, initialStockId = null
   const [searchQuery, setSearchQuery] = useState('')
   const [groupPickerStock, setGroupPickerStock] = useState(null)
   const [groupPickerSelected, setGroupPickerSelected] = useState([])
+  const [inlineEdit, setInlineEdit] = useState({ field: null, value: '' })
   const [stockForm, setStockForm] = useState({
     name: '',
     code: '',
@@ -224,6 +225,90 @@ export default function StockList({ initialGroupId = null, initialStockId = null
 
   const getGroupById = (id) => logicGroups.find(g => g.id === id)
 
+  // Inline edit handlers
+  const startInlineEdit = (field, currentValue) => {
+    setInlineEdit({ field, value: currentValue || '' })
+  }
+
+  const saveInlineEdit = async (stock) => {
+    const { field, value } = inlineEdit
+    if (!field) return
+    
+    if (field === 'name') {
+      if (!value.trim()) return
+      await fetch(`${API}/stocks/${stock.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: value,
+          code: stock.code || '',
+          logic_group_id: stock.logic_group_id,
+          field_values: stock.field_values || {},
+          notes: stock.notes || ''
+        })
+      })
+    } else if (field === 'code') {
+      await fetch(`${API}/stocks/${stock.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: stock.name,
+          code: value,
+          logic_group_id: stock.logic_group_id,
+          field_values: stock.field_values || {},
+          notes: stock.notes || ''
+        })
+      })
+    } else if (field === 'notes') {
+      await fetch(`${API}/stocks/${stock.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: stock.name,
+          code: stock.code || '',
+          logic_group_id: stock.logic_group_id,
+          field_values: stock.field_values || {},
+          notes: value
+        })
+      })
+    } else if (field === 'group') {
+      await fetch(`${API}/stocks/${stock.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: stock.name,
+          code: stock.code || '',
+          logic_group_id: value === '' ? null : value,
+          field_values: stock.field_values || {},
+          notes: stock.notes || ''
+        })
+      })
+    } else {
+      // Custom field
+      const newFieldValues = { ...stock.field_values, [field]: value }
+      await fetch(`${API}/stocks/${stock.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: stock.name,
+          code: stock.code || '',
+          logic_group_id: stock.logic_group_id,
+          field_values: newFieldValues,
+          notes: stock.notes || ''
+        })
+      })
+    }
+    setInlineEdit({ field: null, value: '' })
+    fetchStocks()
+    // Refresh selected stock
+    const updated = stocks.find(s => s.id === stock.id)
+    if (updated) setSelectedStock({ ...updated })
+  }
+
+  const cancelInlineEdit = () => {
+    setInlineEdit({ field: null, value: '' })
+  }
+
   // Filter stocks by group if initialGroupId is set, then by search query
   const displayedStocks = stocks
     .filter(s => !initialGroupId || s.logic_group_id === initialGroupId)
@@ -251,33 +336,120 @@ export default function StockList({ initialGroupId = null, initialStockId = null
         </button>
 
         <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-          {/* Header */}
-          <div className="p-6 border-b border-slate-700 bg-gradient-to-r from-slate-800 to-slate-750">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white">{stock.name}</h2>
-                {stock.code && <span className="text-sm text-slate-400">{stock.code}</span>}
+          {/* Header - Name */}
+          <div className="p-6 border-b border-slate-700">
+            {inlineEdit.field === 'name' ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={inlineEdit.value}
+                  onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                  className="flex-1 bg-slate-700 text-white rounded-lg px-3 py-2 text-xl font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && saveInlineEdit(stock)}
+                />
+                <button onClick={() => saveInlineEdit(stock)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg">保存</button>
+                <button onClick={cancelInlineEdit} className="px-4 py-2 text-slate-400 hover:text-white">取消</button>
               </div>
-              {group && (
-                <span
-                  className="px-3 py-1 rounded-full text-sm"
-                  style={{ backgroundColor: group.color + '30', color: group.color }}
+            ) : (
+              <div className="flex items-start justify-between cursor-pointer hover:bg-slate-700/50 -m-2 p-2 rounded-lg" onClick={() => startInlineEdit('name', stock.name)}>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{stock.name}</h2>
+                  {stock.code && <span className="text-sm text-slate-400">{stock.code}</span>}
+                </div>
+                <Edit2 size={16} className="text-slate-500" />
+              </div>
+            )}
+          </div>
+
+          {/* Code */}
+          <div className="p-4 border-b border-slate-700">
+            <label className="text-xs text-slate-500 uppercase tracking-wider">股票代码</label>
+            {inlineEdit.field === 'code' ? (
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="text"
+                  value={inlineEdit.value}
+                  onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                  className="flex-1 bg-slate-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && saveInlineEdit(stock)}
+                />
+                <button onClick={() => saveInlineEdit(stock)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded text-sm">保存</button>
+                <button onClick={cancelInlineEdit} className="px-3 py-1 text-slate-400 hover:text-white text-sm">取消</button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between mt-1 cursor-pointer hover:bg-slate-700/50 -mx-2 px-2 py-1 rounded" onClick={() => startInlineEdit('code', stock.code || '')}>
+                <span className="text-white text-lg">{stock.code || '点击添加'}</span>
+                <Edit2 size={14} className="text-slate-500" />
+              </div>
+            )}
+          </div>
+
+          {/* Group */}
+          <div className="p-4 border-b border-slate-700">
+            <label className="text-xs text-slate-500 uppercase tracking-wider">所属分组</label>
+            {inlineEdit.field === 'group' ? (
+              <div className="flex flex-wrap gap-2 mt-2">
+                <button
+                  onClick={() => saveInlineEdit({ ...stock, logic_group_id: null })}
+                  className={`px-3 py-1 rounded text-sm ${!inlineEdit.value ? 'bg-indigo-600' : 'bg-slate-700 hover:bg-slate-600'}`}
                 >
-                  {group.name}
-                </span>
-              )}
-            </div>
+                  无
+                </button>
+                {logicGroups.map(g => (
+                  <button
+                    key={g.id}
+                    onClick={() => saveInlineEdit({ ...stock, logic_group_id: g.id })}
+                    className={`px-3 py-1 rounded text-sm ${inlineEdit.value === g.id ? 'ring-2 ring-white' : ''}`}
+                    style={{ backgroundColor: g.color + '40', color: g.color }}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+                <button onClick={cancelInlineEdit} className="px-3 py-1 text-slate-400 hover:text-white text-sm">取消</button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between mt-1 cursor-pointer hover:bg-slate-700/50 -mx-2 px-2 py-1 rounded" onClick={() => startInlineEdit('group', stock.logic_group_id || '')}>
+                {group ? (
+                  <span className="px-2 py-0.5 rounded text-sm" style={{ backgroundColor: group.color + '30', color: group.color }}>{group.name}</span>
+                ) : (
+                  <span className="text-slate-500 text-sm">点击添加分组</span>
+                )}
+                <Edit2 size={14} className="text-slate-500" />
+              </div>
+            )}
           </div>
 
           {/* Custom Fields */}
           {customFields.length > 0 && (
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">详细信息</h3>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 border-b border-slate-700">
+              <label className="text-xs text-slate-500 uppercase tracking-wider">详细信息</label>
+              <div className="grid grid-cols-2 gap-3 mt-2">
                 {customFields.map((field) => (
-                  <div key={field.id} className="bg-slate-700 rounded-lg p-4">
-                    <span className="text-sm text-slate-400">{field.name}</span>
-                    <p className="text-white mt-1 text-lg">{stock.field_values[field.id] || '-'}</p>
+                  <div key={field.id} className="bg-slate-700 rounded-lg p-3">
+                    {inlineEdit.field === field.id ? (
+                      <div>
+                        <span className="text-xs text-slate-400">{field.name}</span>
+                        <div className="flex gap-1 mt-1">
+                          <input
+                            type={field.field_type === 'number' ? 'number' : 'text'}
+                            step="0.01"
+                            value={inlineEdit.value}
+                            onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                            className="flex-1 bg-slate-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && saveInlineEdit(stock)}
+                          />
+                          <button onClick={() => saveInlineEdit(stock)} className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 rounded text-xs">✓</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="cursor-pointer hover:bg-slate-600/50 -mx-1 px-1 py-0.5 rounded" onClick={() => startInlineEdit(field.id, stock.field_values[field.id] || '')}>
+                        <span className="text-xs text-slate-400">{field.name}</span>
+                        <p className="text-white text-sm">{stock.field_values[field.id] || '-'}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -285,30 +457,47 @@ export default function StockList({ initialGroupId = null, initialStockId = null
           )}
 
           {/* Notes */}
-          {stock.notes && (
-            <div className="p-6 border-t border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4">备注</h3>
-              <div className="bg-slate-700 rounded-lg p-4">
-                <p className="text-slate-300 whitespace-pre-wrap">{stock.notes}</p>
+          <div className="p-4 border-b border-slate-700">
+            <label className="text-xs text-slate-500 uppercase tracking-wider">备注</label>
+            {inlineEdit.field === 'notes' ? (
+              <div className="mt-1">
+                <textarea
+                  value={inlineEdit.value}
+                  onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                  className="w-full bg-slate-700 text-white rounded px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  rows={4}
+                  autoFocus
+                />
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => saveInlineEdit(stock)} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded text-sm">保存</button>
+                  <button onClick={cancelInlineEdit} className="px-3 py-1 text-slate-400 hover:text-white text-sm">取消</button>
+                </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="mt-1 cursor-pointer hover:bg-slate-700/50 -mx-2 px-2 py-1 rounded min-h-[40px]" onClick={() => startInlineEdit('notes', stock.notes || '')}>
+                <p className="text-slate-300 text-sm whitespace-pre-wrap">{stock.notes || '点击添加备注...'}</p>
+              </div>
+            )}
+          </div>
 
           {/* Actions */}
-          <div className="p-6 border-t border-slate-700 flex gap-3">
-            <button
-              onClick={() => startEditStock(stock)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
-            >
-              <Edit2 size={16} />
-              编辑
-            </button>
+          <div className="p-4 flex justify-between">
             <button
               onClick={() => { handleDeleteStock(stock.id) }}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-red-400 hover:bg-red-600/20 rounded-lg transition-colors"
             >
               <Trash2 size={16} />
               删除
+            </button>
+            <button
+              onClick={() => {
+                // Quick add a custom field if none exist
+                if (customFields.length === 0) setShowFieldForm(true)
+              }}
+              className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <Settings size={16} />
+              {customFields.length === 0 ? '添加字段' : '管理字段'}
             </button>
           </div>
         </div>
