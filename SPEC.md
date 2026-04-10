@@ -84,11 +84,12 @@ Bruce8588/life-manager (GitHub主仓库)
 
 ## 端口分配
 
-| 端口 | 服务 | 路径 | 说明 |
-|------|------|------|------|
-| 3000 | trading-system 前端 | / | 交易系统主界面 |
-| 3001 | 星夜导航 | /life/ | 星夜入口页面 |
+| 端口 | 服务 | Nginx路径 | 说明 |
+|------|------|-----------|------|
+| 3000 | trading-system 前端 | /trading-p9m4v/ | 交易系统主界面 |
+| 3001 | 星夜导航 | /starry-h7k2s/life/ | 星夜入口页面 |
 | 5001 | trading-system API | /api | Flask后端API |
+| 5002 | 饮食追踪 | /diet-n8w3x/ | 饮食追踪系统 |
 
 ---
 
