@@ -91,7 +91,7 @@ export default function HomePage() {
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-warm-800 mb-2">人生管理</h1>
+          <h1 className="text-4xl md:text-5xl font-bold text-warm-800 mb-2">星夜</h1>
           <p className="text-warm-600 text-lg">规划生活，掌握未来</p>
         </div>
 
