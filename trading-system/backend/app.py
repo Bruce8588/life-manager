@@ -130,6 +130,14 @@ class Decision(Base):
     position_period = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class MarketRecord(Base):
+    __tablename__ = 'market_records'
+    id = Column(Integer, primary_key=True)
+    date = Column(String(20))  # YYYY-MM-DD
+    data = Column(JSON)  # {trend_key: {value: number, note: string, color: string}, ...}
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 # Create tables
 Base.metadata.create_all(engine)
 
@@ -888,6 +896,71 @@ def delete_decision(id):
     decision = session.query(Decision).get(id)
     if decision:
         session.delete(decision)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Market Records ---
+@app.route('/api/market-records', methods=['GET'])
+def get_market_records():
+    session = Session()
+    records = session.query(MarketRecord).order_by(MarketRecord.date.desc()).all()
+    result = [{
+        'id': r.id,
+        'date': r.date,
+        'data': r.data or {},
+        'created_at': r.created_at.isoformat()
+    } for r in records]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/market-records', methods=['POST'])
+def create_market_record():
+    data = request.json
+    session = Session()
+    record = MarketRecord(
+        date=data.get('date', datetime.now().strftime('%Y-%m-%d')),
+        data=data.get('data', {})
+    )
+    session.add(record)
+    session.commit()
+    result = {
+        'id': record.id,
+        'date': record.date,
+        'data': record.data or {},
+        'created_at': record.created_at.isoformat()
+    }
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/market-records/<int:id>', methods=['PUT'])
+def update_market_record(id):
+    data = request.json
+    session = Session()
+    record = session.query(MarketRecord).get(id)
+    if record:
+        record.date = data.get('date', record.date)
+        record.data = data.get('data', record.data)
+        session.commit()
+        result = {
+            'id': record.id,
+            'date': record.date,
+            'data': record.data or {},
+            'created_at': record.created_at.isoformat()
+        }
+        session.close()
+        return jsonify(result)
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/market-records/<int:id>', methods=['DELETE'])
+def delete_market_record(id):
+    session = Session()
+    record = session.query(MarketRecord).get(id)
+    if record:
+        session.delete(record)
         session.commit()
         session.close()
         return jsonify({'success': True})

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, Network, Database, Palette, Menu, X, BarChart3, Shield, GripVertical, BookOpen } from 'lucide-react'
+import { FileText, Network, Database, Palette, Menu, X, BarChart3, Shield, GripVertical, BookOpen, Table } from 'lucide-react'
 import MemoList from './components/Memo/MemoList'
 import LogicGroupList from './components/LogicGroups/LogicGroupList'
 import StockList from './components/Stocks/StockList'
@@ -7,6 +7,7 @@ import TradingModelList from './components/TradingModels/TradingModelList'
 import MarketInfoList from './components/MarketInfo/MarketInfoList'
 import RiskControl from './components/RiskControl/RiskControl'
 import TradingReview from './components/TradingReview/TradingReview'
+import MarketRecords from './components/MarketRecords/MarketRecords'
 
 const PENDING_STOCK_KEY = '__pending_stock_id__'
 const PAGE_ORDER_KEY = '__page_order__'
@@ -20,6 +21,7 @@ const DEFAULT_PAGE_ORDER = [
   { id: 'models', label: '交易模型', icon: Palette },
   { id: 'risk', label: '决策与风控', icon: Shield },
   { id: 'review', label: '交易复盘', icon: BookOpen },
+  { id: 'records', label: '行情记录', icon: Table },
 ]
 
 function App() {
@@ -98,6 +100,8 @@ function App() {
         return <RiskControl />
       case 'review':
         return <TradingReview />
+      case 'records':
+        return <MarketRecords />
       case 'market':
       default:
         return <MarketInfoList />
