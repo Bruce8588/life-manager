@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Plus, Trash2, RefreshCw, StickyNote, X } from 'lucide-react'
+import { Table, Plus, Trash2, RefreshCw, StickyNote, X, ChevronDown, ChevronRight } from 'lucide-react'
 
 const API = '/api'
 const TREND_COLUMNS = [
@@ -18,21 +18,35 @@ const TREND_COLUMNS = [
 export default function MarketRecords({ stockId, stockName, onBack }) {
   const [records, setRecords] = useState([])
   const [stocks, setStocks] = useState([])
+  const [groups, setGroups] = useState([])
   const [selectedStockId, setSelectedStockId] = useState(stockId || null)
+  const [selectedGroupId, setSelectedGroupId] = useState(null) // filter by group
+  const [collapsedGroups, setCollapsedGroups] = useState({})
   const [loading, setLoading] = useState(true)
   const [editingCell, setEditingCell] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [showNoteModal, setShowNoteModal] = useState(null)
 
   useEffect(() => {
+    fetchGroups()
     fetchStocks()
   }, [])
 
   useEffect(() => {
-    if (selectedStockId || stockId) {
+    if (selectedStockId) {
       fetchRecords()
     }
-  }, [selectedStockId, stockId])
+  }, [selectedStockId])
+
+  const fetchGroups = async () => {
+    try {
+      const res = await fetch(`${API}/logic-groups`)
+      const data = await res.json()
+      setGroups(data)
+    } catch (err) {
+      console.error('Failed to fetch groups:', err)
+    }
+  }
 
   const fetchStocks = async () => {
     try {
@@ -40,7 +54,13 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
       const data = await res.json()
       setStocks(data)
       if (!selectedStockId && data.length > 0) {
-        setSelectedStockId(data[0].id)
+        // Auto-select first stock with a group if filtering by group
+        if (selectedGroupId) {
+          const groupStock = data.find(s => s.logic_group_id === selectedGroupId)
+          if (groupStock) setSelectedStockId(groupStock.id)
+        } else {
+          setSelectedStockId(data[0].id)
+        }
       }
     } catch (err) {
       console.error('Failed to fetch stocks:', err)
@@ -133,7 +153,6 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
     }
   }
 
-  // Calculate percentage: current row's filled value vs previous row's filled value (any column)
   const getPreviousFilledValue = (currentRecordIndex) => {
     for (let i = currentRecordIndex + 1; i < records.length; i++) {
       const record = records[i]
@@ -158,6 +177,24 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
     return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', weekday: 'short' })
   }
 
+  const toggleGroupCollapse = (groupId) => {
+    setCollapsedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }))
+  }
+
+  // Group stocks by logic group
+  const stocksByGroup = {}
+  stocks.forEach(stock => {
+    const groupId = stock.logic_group_id || 'ungrouped'
+    const groupName = stock.logic_group?.name || '未分组'
+    const groupColor = stock.logic_group?.color || '#6b7280'
+    if (!stocksByGroup[groupId]) {
+      stocksByGroup[groupId] = { name: groupName, color: groupColor, stocks: [] }
+    }
+    stocksByGroup[groupId].stocks.push(stock)
+  })
+
+  const selectedStock = stocks.find(s => s.id === selectedStockId)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -180,28 +217,106 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
           <h2 className="text-2xl font-bold text-white">行情记录</h2>
         </div>
         
-        {/* Stock Selector */}
-        <select
-          value={selectedStockId || ''}
-          onChange={(e) => setSelectedStockId(e.target.value ? parseInt(e.target.value) : null)}
-          className="bg-slate-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="">所有股票</option>
-          {stocks.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-
         <div className="flex items-center gap-2">
           <button onClick={fetchRecords} className="p-2 bg-slate-700 rounded-lg text-slate-400 hover:text-white" title="刷新">
             <RefreshCw size={18} />
           </button>
-          <button onClick={addRecord} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+          <button onClick={addRecord} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg" disabled={!selectedStockId}>
             <Plus size={18} />
             新增行
           </button>
         </div>
       </div>
+
+      {/* Stock Group Selector */}
+      <div className="mb-4 bg-slate-800 rounded-lg border border-slate-700 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-slate-400 text-sm">按分组选择股票：</span>
+          <button
+            onClick={() => setSelectedGroupId(null)}
+            className={`px-3 py-1 rounded text-sm ${!selectedGroupId ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+          >
+            全部
+          </button>
+        </div>
+        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {Object.entries(stocksByGroup).map(([groupId, group]) => {
+            const isCollapsed = collapsedGroups[groupId]
+            const isSelected = selectedGroupId === (groupId === 'ungrouped' ? null : parseInt(groupId))
+            
+            return (
+              <div key={groupId}>
+                <div 
+                  className={`flex items-center gap-2 p-2 rounded cursor-pointer ${isSelected ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}
+                  style={{ paddingLeft: '8px' }}
+                >
+                  <button
+                    onClick={() => toggleGroupCollapse(groupId)}
+                    className="p-1 text-slate-400 hover:text-white"
+                  >
+                    {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const gid = groupId === 'ungrouped' ? null : parseInt(groupId)
+                      setSelectedGroupId(gid)
+                      // Select first stock in group
+                      if (group.stocks.length > 0) {
+                        setSelectedStockId(group.stocks[0].id)
+                      }
+                    }}
+                    className="flex items-center gap-2 flex-1"
+                  >
+                    <span 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: group.color }}
+                    />
+                    <span className="text-slate-300 text-sm">{group.name}</span>
+                    <span className="text-slate-500 text-xs">({group.stocks.length})</span>
+                  </button>
+                </div>
+                
+                {!isCollapsed && (
+                  <div className="pl-6 space-y-1 mt-1">
+                    {group.stocks.map(stock => (
+                      <button
+                        key={stock.id}
+                        onClick={() => setSelectedStockId(stock.id)}
+                        className={`w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 ${
+                          selectedStockId === stock.id 
+                            ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50' 
+                            : 'text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        <span>{stock.name}</span>
+                        {stock.code && <span className="text-slate-500 text-xs">{stock.code}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Current Stock */}
+      {selectedStock && (
+        <div className="mb-3 flex items-center gap-3">
+          <span className="text-slate-400">当前股票：</span>
+          <span className="px-3 py-1 bg-indigo-600/30 text-indigo-300 rounded-lg font-medium">
+            {selectedStock.name}
+          </span>
+          {selectedStock.logic_group && (
+            <span 
+              className="px-2 py-0.5 rounded text-xs"
+              style={{ backgroundColor: selectedStock.logic_group.color + '30', color: selectedStock.logic_group.color }}
+            >
+              {selectedStock.logic_group.name}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto bg-slate-800 rounded-lg border border-slate-700">
@@ -231,7 +346,6 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                   <td className="p-2 border border-slate-700 sticky left-0 bg-slate-800 z-10">
                     <span className="text-white font-medium">{formatDate(record.date)}</span>
                   </td>
-                  {/* Percent change column */}
                   <td className="p-2 border border-slate-700 text-center">
                     {percentChange !== null ? (
                       <span className={`font-medium ${parseFloat(percentChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -241,7 +355,6 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                       <span className="text-slate-600">-</span>
                     )}
                   </td>
-                  {/* Trend columns */}
                   {TREND_COLUMNS.map(col => {
                     const cellData = record.data?.[col.key] || {}
                     const cellValue = cellData.value
@@ -273,9 +386,7 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                             autoFocus
                           />
                         ) : (
-                          <div
-                            className="flex items-center justify-center gap-1"
-                          >
+                          <div className="flex items-center justify-center gap-1">
                             <span
                               className="py-2 cursor-pointer hover:bg-slate-600/50 rounded w-full text-center text-white"
                               onClick={() => {
@@ -312,7 +423,7 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
             {records.length === 0 && (
               <tr>
                 <td colSpan={12} className="p-8 text-center text-slate-500">
-                  暂无记录，点击"新增行"开始
+                  {selectedStockId ? '暂无记录，点击"新增行"开始' : '请先选择股票'}
                 </td>
               </tr>
             )}
