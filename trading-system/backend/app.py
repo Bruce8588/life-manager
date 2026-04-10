@@ -1021,8 +1021,68 @@ class PsychologyTool(life_Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+class HealthPlan(life_Base):
+    __tablename__ = 'health_plans'
+    id = Column(String(100), primary_key=True)
+    name = Column(String(200), nullable=False)
+    duration = Column(String(50), default='30天')
+    start_date = Column(String(20), default='')
+    status = Column(String(20), default='planning')  # planning, active, completed
+    goals_json = Column(Text, default='[]')  # JSON array of goals
+    reflection = Column(Text, default='')  # 执行情况反思
+    expected_results = Column(Text, default='')  # 预期成果
+    final_results = Column(Text, default='')  # 最终成果
+    memo = Column(Text, default='')  # 高自由度备忘录
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 # Create life-manager tables
 life_Base.metadata.create_all(life_engine)
+
+# ============== Reading Database ==============
+READING_DB_URL = "sqlite:////root/life-manager/reading.db"
+reading_engine = create_engine(READING_DB_URL, echo=False)
+reading_Base = declarative_base()
+ReadingSession = sessionmaker(bind=reading_engine)
+
+class ReadingBook(reading_Base):
+    __tablename__ = 'books'
+    id = Column(String(100), primary_key=True)
+    title = Column(String(200), nullable=False)
+    author = Column(String(200), default='')
+    cover = Column(Text, default='')
+    description = Column(Text, default='')
+    color = Column(String(20), default='#6366f1')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ReadingNote(reading_Base):
+    __tablename__ = 'notes'
+    id = Column(Integer, primary_key=True)
+    book_id = Column(String(100), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ReadingSummary(reading_Base):
+    __tablename__ = 'summaries'
+    id = Column(Integer, primary_key=True)
+    book_id = Column(String(100), nullable=False)
+    title = Column(String(200), default='')  # 笔记标题/主题
+    content = Column(Text, nullable=False)  # 笔记内容
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ReadingMindMap(reading_Base):
+    __tablename__ = 'mindmaps'
+    id = Column(Integer, primary_key=True)
+    book_id = Column(String(100), nullable=False)
+    nodes = Column(Text, default='[]')  # JSON string of mindmap nodes
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Create reading tables
+reading_Base.metadata.create_all(reading_engine)
 
 # ============== Life Manager API Routes ==============
 
@@ -1302,5 +1362,308 @@ def delete_psychology_tool(tool_id):
     session.close()
     return jsonify({'error': 'Not found'}), 404
 
+# ============== Health Plans API Routes ==============
+
+@app.route('/api/life/health-plans', methods=['GET'])
+def get_health_plans():
+    session = LifeSession()
+    plans = session.query(HealthPlan).all()
+    result = [{
+        'id': p.id,
+        'name': p.name,
+        'duration': p.duration,
+        'start_date': p.start_date or '',
+        'status': p.status,
+        'goals': json.loads(p.goals_json) if p.goals_json else [],
+        'reflection': p.reflection or '',
+        'expected_results': p.expected_results or '',
+        'final_results': p.final_results or '',
+        'memo': p.memo or '',
+        'created_at': p.created_at.isoformat() if p.created_at else None
+    } for p in plans]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/life/health-plans', methods=['POST'])
+def create_health_plan():
+    data = request.get_json()
+    plan = HealthPlan(
+        id=data.get('id', 'plan-' + str(datetime.utcnow().timestamp())),
+        name=data.get('name', '新健康方案'),
+        duration=data.get('duration', '30天'),
+        start_date=data.get('start_date', ''),
+        status=data.get('status', 'planning'),
+        goals_json=json.dumps(data.get('goals', [])),
+        reflection=data.get('reflection', ''),
+        expected_results=data.get('expected_results', ''),
+        final_results=data.get('final_results', ''),
+        memo=data.get('memo', '')
+    )
+    session = LifeSession()
+    session.add(plan)
+    session.commit()
+    plan_id = plan.id
+    session.close()
+    return jsonify({'id': plan_id, 'success': True})
+
+@app.route('/api/life/health-plans/<plan_id>', methods=['PUT'])
+def update_health_plan(plan_id):
+    data = request.get_json()
+    session = LifeSession()
+    plan = session.query(HealthPlan).get(plan_id)
+    if plan:
+        if 'name' in data: plan.name = data['name']
+        if 'duration' in data: plan.duration = data['duration']
+        if 'start_date' in data: plan.start_date = data['start_date']
+        if 'status' in data: plan.status = data['status']
+        if 'goals' in data: plan.goals_json = json.dumps(data['goals'])
+        if 'reflection' in data: plan.reflection = data['reflection']
+        if 'expected_results' in data: plan.expected_results = data['expected_results']
+        if 'final_results' in data: plan.final_results = data['final_results']
+        if 'memo' in data: plan.memo = data['memo']
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/life/health-plans/<plan_id>', methods=['DELETE'])
+def delete_health_plan(plan_id):
+    session = LifeSession()
+    plan = session.query(HealthPlan).get(plan_id)
+    if plan:
+        session.delete(plan)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# ============== Reading API Routes ==============
+
+# --- Books ---
+
+@app.route('/api/reading/books', methods=['GET'])
+def get_reading_books():
+    session = ReadingSession()
+    books = session.query(ReadingBook).all()
+    result = [{
+        'id': b.id, 'title': b.title, 'author': b.author or '',
+        'cover': b.cover or '', 'description': b.description or '',
+        'color': b.color,
+        'created_at': b.created_at.isoformat() if b.created_at else None
+    } for b in books]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/reading/books', methods=['POST'])
+def create_reading_book():
+    data = request.get_json()
+    book = ReadingBook(
+        id=data.get('id', str(datetime.utcnow().timestamp())),
+        title=data.get('title', ''),
+        author=data.get('author', ''),
+        cover=data.get('cover', ''),
+        description=data.get('description', ''),
+        color=data.get('color', '#6366f1')
+    )
+    session = ReadingSession()
+    session.add(book)
+    session.commit()
+    book_id = book.id
+    session.close()
+    return jsonify({'id': book_id, 'success': True})
+
+@app.route('/api/reading/books/<book_id>', methods=['PUT'])
+def update_reading_book(book_id):
+    data = request.get_json()
+    session = ReadingSession()
+    book = session.query(ReadingBook).get(book_id)
+    if book:
+        if 'title' in data: book.title = data['title']
+        if 'author' in data: book.author = data['author']
+        if 'cover' in data: book.cover = data['cover']
+        if 'description' in data: book.description = data['description']
+        if 'color' in data: book.color = data['color']
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/reading/books/<book_id>', methods=['DELETE'])
+def delete_reading_book(book_id):
+    session = ReadingSession()
+    book = session.query(ReadingBook).get(book_id)
+    if book:
+        # Delete all notes and mindmaps for this book
+        session.query(ReadingNote).filter(ReadingNote.book_id == book_id).delete()
+        session.query(ReadingMindMap).filter(ReadingMindMap.book_id == book_id).delete()
+        session.delete(book)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Notes ---
+
+@app.route('/api/reading/notes', methods=['GET'])
+def get_reading_notes():
+    book_id = request.args.get('book_id')
+    session = ReadingSession()
+    if book_id:
+        notes = session.query(ReadingNote).filter(ReadingNote.book_id == book_id).all()
+    else:
+        notes = session.query(ReadingNote).all()
+    result = [{
+        'id': n.id, 'book_id': n.book_id, 'content': n.content,
+        'created_at': n.created_at.isoformat() if n.created_at else None
+    } for n in notes]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/reading/notes', methods=['POST'])
+def create_reading_note():
+    data = request.get_json()
+    note = ReadingNote(
+        book_id=data.get('book_id', ''),
+        content=data.get('content', '')
+    )
+    session = ReadingSession()
+    session.add(note)
+    session.commit()
+    result = {
+        'id': note.id, 'book_id': note.book_id, 'content': note.content,
+        'created_at': note.created_at.isoformat() if note.created_at else None
+    }
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/reading/notes/<int:note_id>', methods=['PUT'])
+def update_reading_note(note_id):
+    data = request.get_json()
+    session = ReadingSession()
+    note = session.query(ReadingNote).get(note_id)
+    if note:
+        if 'content' in data: note.content = data['content']
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/reading/notes/<int:note_id>', methods=['DELETE'])
+def delete_reading_note(note_id):
+    session = ReadingSession()
+    note = session.query(ReadingNote).get(note_id)
+    if note:
+        session.delete(note)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Summaries (正式笔记) ---
+
+@app.route('/api/reading/summaries', methods=['GET'])
+def get_reading_summaries():
+    book_id = request.args.get('book_id')
+    session = ReadingSession()
+    if book_id:
+        summaries = session.query(ReadingSummary).filter(ReadingSummary.book_id == book_id).all()
+    else:
+        summaries = session.query(ReadingSummary).all()
+    result = [{
+        'id': s.id, 'book_id': s.book_id, 'title': s.title or '',
+        'content': s.content,
+        'created_at': s.created_at.isoformat() if s.created_at else None
+    } for s in summaries]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/reading/summaries', methods=['POST'])
+def create_reading_summary():
+    data = request.get_json()
+    summary = ReadingSummary(
+        book_id=data.get('book_id', ''),
+        title=data.get('title', ''),
+        content=data.get('content', '')
+    )
+    session = ReadingSession()
+    session.add(summary)
+    session.commit()
+    result = {
+        'id': summary.id, 'book_id': summary.book_id,
+        'title': summary.title, 'content': summary.content,
+        'created_at': summary.created_at.isoformat() if summary.created_at else None
+    }
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/reading/summaries/<int:summary_id>', methods=['PUT'])
+def update_reading_summary(summary_id):
+    data = request.get_json()
+    session = ReadingSession()
+    summary = session.query(ReadingSummary).get(summary_id)
+    if summary:
+        if 'title' in data: summary.title = data['title']
+        if 'content' in data: summary.content = data['content']
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/reading/summaries/<int:summary_id>', methods=['DELETE'])
+def delete_reading_summary(summary_id):
+    session = ReadingSession()
+    summary = session.query(ReadingSummary).get(summary_id)
+    if summary:
+        session.delete(summary)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Mind Maps ---
+
+@app.route('/api/reading/mindmaps', methods=['GET'])
+def get_reading_mindmaps():
+    book_id = request.args.get('book_id')
+    session = ReadingSession()
+    if book_id:
+        mindmaps = session.query(ReadingMindMap).filter(ReadingMindMap.book_id == book_id).all()
+    else:
+        mindmaps = session.query(ReadingMindMap).all()
+    result = [{
+        'id': m.id, 'book_id': m.book_id, 'nodes': json.loads(m.nodes) if m.nodes else [],
+        'created_at': m.created_at.isoformat() if m.created_at else None
+    } for m in mindmaps]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/reading/mindmaps', methods=['POST'])
+def create_or_update_mindmap():
+    data = request.get_json()
+    book_id = data.get('book_id', '')
+    session = ReadingSession()
+    mindmap = session.query(ReadingMindMap).filter(ReadingMindMap.book_id == book_id).first()
+    if mindmap:
+        mindmap.nodes = json.dumps(data.get('nodes', []))
+        session.commit()
+        result = {'id': mindmap.id, 'book_id': mindmap.book_id, 'nodes': json.loads(mindmap.nodes)}
+    else:
+        mindmap = ReadingMindMap(
+            book_id=book_id,
+            nodes=json.dumps(data.get('nodes', []))
+        )
+        session.add(mindmap)
+        session.commit()
+        result = {'id': mindmap.id, 'book_id': mindmap.book_id, 'nodes': json.loads(mindmap.nodes)}
+    session.close()
+    return jsonify(result)
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5649)

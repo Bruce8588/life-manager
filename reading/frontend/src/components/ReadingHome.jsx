@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Book, Plus, Edit3, Trash2, X, BookOpen } from 'lucide-react'
-
-const STORAGE_KEY = 'reading-books'
+import { readingApi } from '../utils/readingApi'
 
 export default function ReadingHome() {
   const navigate = useNavigate()
@@ -12,30 +12,26 @@ export default function ReadingHome() {
   const [formData, setFormData] = useState({ title: '', author: '', cover: '', description: '', color: '#6366f1' })
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      setBooks(JSON.parse(saved))
-    }
+    readingApi.getBooks().then(data => {
+      setBooks(data)
+    })
   }, [])
-
-  const saveBooks = (newBooks) => {
-    setBooks(newBooks)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newBooks))
-  }
 
   const handleSubmit = () => {
     if (!formData.title.trim()) return
     
     if (editingBook) {
-      saveBooks(books.map(b => b.id === editingBook.id ? { ...b, ...formData } : b))
+      readingApi.updateBook(editingBook.id, formData).then(() => {
+        setBooks(books.map(b => b.id === editingBook.id ? { ...b, ...formData } : b))
+      })
     } else {
       const newBook = {
         id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString(),
-        notes: []
+        ...formData
       }
-      saveBooks([...books, newBook])
+      readingApi.createBook(newBook).then(() => {
+        setBooks([...books, { ...newBook, created_at: new Date().toISOString() }])
+      })
     }
     setShowModal(false)
     setEditingBook(null)
@@ -44,13 +40,21 @@ export default function ReadingHome() {
 
   const handleDelete = (id) => {
     if (confirm('确定删除这本书吗？')) {
-      saveBooks(books.filter(b => b.id !== id))
+      readingApi.deleteBook(id).then(() => {
+        setBooks(books.filter(b => b.id !== id))
+      })
     }
   }
 
   const handleEdit = (book) => {
     setEditingBook(book)
-    setFormData({ title: book.title, author: book.author, cover: book.cover, description: book.description, color: book.color })
+    setFormData({ 
+      title: book.title, 
+      author: book.author || '', 
+      cover: book.cover || '', 
+      description: book.description || '', 
+      color: book.color 
+    })
     setShowModal(true)
   }
 
@@ -71,7 +75,7 @@ export default function ReadingHome() {
             </div>
           </div>
           <button
-            onClick={() => { setShowModal(true); setEditingBook(null); setFormData({ title: '', author: '', cover: '', description: '', color: '#6366f1' }) }}
+            onClick={() => { setShowModal(true); setEditingBook(null); setFormData({ title: '', author: '', cover: '', description: '', color: '#6366f1' }); }}
             className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-3 rounded-xl hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl"
           >
             <Plus size={20} />
@@ -117,7 +121,6 @@ export default function ReadingHome() {
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-800 truncate">{book.title}</h3>
                   <p className="text-sm text-gray-500 truncate">{book.author || '未知作者'}</p>
-                  <p className="text-xs text-gray-400 mt-1">{book.notes?.length || 0} 条笔记</p>
                 </div>
 
                 {/* Action Buttons */}

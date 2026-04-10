@@ -8,9 +8,10 @@ export default defineConfig({
     port: 6789,
     proxy: {
       '/api/reading': {
-        target: 'http://localhost:6790',
+        target: 'http://localhost:5649',
         changeOrigin: true
       }
-    }
+    },
+    historyApiFallback: true
   }
 })

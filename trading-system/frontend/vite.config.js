@@ -11,6 +11,7 @@ export default defineConfig({
         target: 'http://localhost:5649',
         changeOrigin: true
       }
-    }
+    },
+    historyApiFallback: true
   }
 })

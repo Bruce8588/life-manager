@@ -5,12 +5,13 @@ export default defineConfig({
   base: '/life/',
   plugins: [react()],
   server: {
-    port: 3001,
+    port: 8975,
     proxy: {
       '/api': {
         target: 'http://localhost:5649',
         changeOrigin: true
       }
-    }
+    },
+    historyApiFallback: true
   }
 })
