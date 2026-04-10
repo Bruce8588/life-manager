@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Edit2, Trash2, Save, X, Palette, Eye, Edit3 } from 'lucide-react'
 import DrawingCanvas from '../Canvas/DrawingCanvas'
 
@@ -95,7 +95,7 @@ export default function TradingModelList() {
     setViewMode('view')
   }
 
-  const handleCanvasSave = (dataUrl) => {
+  const handleCanvasSave = useCallback((dataUrl) => {
     setDrawingData(dataUrl)
     // Auto-save to backend
     if (currentModelId) {
@@ -105,7 +105,7 @@ export default function TradingModelList() {
         body: JSON.stringify({ drawing_data: dataUrl })
       }).catch(console.error)
     }
-  }
+  }, [currentModelId])
 
   const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleString('zh-CN', {

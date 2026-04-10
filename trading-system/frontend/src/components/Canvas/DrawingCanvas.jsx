@@ -34,7 +34,12 @@ export default function DrawingCanvas({ initialData, onSave }) {
       setHistoryIndex(0)
       redrawCanvas(initialData)
     } else {
-      saveToHistory()
+      // Initialize blank canvas
+      const ctx = canvasRef.current?.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = '#1e293b'
+        ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+      }
     }
   }, [])
 
