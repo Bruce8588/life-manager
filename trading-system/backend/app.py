@@ -135,10 +135,7 @@ class MarketRecord(Base):
     id = Column(Integer, primary_key=True)
     stock_id = Column(Integer, ForeignKey('stocks.id'))
     date = Column(String(20))  # YYYY-MM-DD
-    trend = Column(String(20))  # which trend column: up, up_natural, etc.
-    value = Column(Float, default=0)
-    note = Column(Text)
-    color = Column(String(20))
+    data = Column(JSON, default=dict)  # JSON object with trend data
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
