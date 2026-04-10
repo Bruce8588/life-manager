@@ -26,30 +26,30 @@ export default function DrawingCanvas({ initialData, onSave }) {
   const [startPos, setStartPos] = useState(null)
   const [textInput, setTextInput] = useState('')
   const [textPos, setTextPos] = useState(null)
+  const lastPosRef = useRef(null)
 
-  // Load initial drawing data
+  // Initialize canvas
   useEffect(() => {
-    if (initialData) {
-      setHistory([initialData])
-      setHistoryIndex(0)
-      redrawCanvas(initialData)
-    } else {
-      // Initialize blank canvas
-      const ctx = canvasRef.current?.getContext('2d')
-      if (ctx) {
-        ctx.fillStyle = '#1e293b'
-        ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-      }
-    }
-  }, [])
-
-  const getContext = useCallback(() => {
     const canvas = canvasRef.current
-    if (!canvas) return null
+    if (!canvas) return
     const ctx = canvas.getContext('2d')
     ctx.fillStyle = '#1e293b'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
-    return ctx
+    
+    if (initialData) {
+      const img = new Image()
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0)
+        saveToHistory()
+      }
+      img.src = initialData
+    } else {
+      saveToHistory()
+    }
+  }, [])
+
+  const getCtx = useCallback(() => {
+    return canvasRef.current?.getContext('2d')
   }, [])
 
   const saveToHistory = useCallback(() => {
@@ -63,18 +63,19 @@ export default function DrawingCanvas({ initialData, onSave }) {
     if (onSave) onSave(dataUrl)
   }, [history, historyIndex, onSave])
 
-  const redrawCanvas = (dataUrl) => {
+  const redrawFromHistory = useCallback((index) => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx || !dataUrl) return
+    if (!canvas || !ctx || index < 0 || index >= history.length) return
+    
     const img = new Image()
     img.onload = () => {
       ctx.fillStyle = '#1e293b'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(img, 0, 0)
     }
-    img.src = dataUrl
-  }
+    img.src = history[index]
+  }, [history])
 
   const getPos = (e) => {
     const canvas = canvasRef.current
@@ -97,6 +98,7 @@ export default function DrawingCanvas({ initialData, onSave }) {
     e.preventDefault()
     const pos = getPos(e)
     setStartPos(pos)
+    lastPosRef.current = pos
     setIsDrawing(true)
 
     if (tool === 'text') {
@@ -104,48 +106,49 @@ export default function DrawingCanvas({ initialData, onSave }) {
       return
     }
 
-    if (tool === 'brush' || tool === 'eraser') {
-      const ctx = getContext()
-      if (!ctx) return
-      ctx.beginPath()
-      ctx.moveTo(pos.x, pos.y)
-      ctx.strokeStyle = tool === 'eraser' ? '#1e293b' : color
-      ctx.lineWidth = tool === 'eraser' ? lineWidth * 3 : lineWidth
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-    }
+    const ctx = getCtx()
+    if (!ctx) return
+
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+    ctx.strokeStyle = tool === 'eraser' ? '#1e293b' : color
+    ctx.lineWidth = tool === 'eraser' ? lineWidth * 3 : lineWidth
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
   }
 
   const handleMove = (e) => {
     if (!isDrawing || tool === 'text') return
     e.preventDefault()
     const pos = getPos(e)
+    const ctx = getCtx()
+    if (!ctx) return
 
     if (tool === 'brush' || tool === 'eraser') {
-      const ctx = getContext()
-      if (!ctx) return
       ctx.lineTo(pos.x, pos.y)
       ctx.stroke()
+      lastPosRef.current = pos
     } else if (tool === 'line' || tool === 'rectangle' || tool === 'circle') {
-      // Restore previous state and draw preview
-      const currentHistory = history[historyIndex]
-      redrawCanvas(currentHistory)
-      const ctx = getContext()
-      if (!ctx) return
-      ctx.strokeStyle = color
-      ctx.lineWidth = lineWidth
+      // Restore from history and draw preview
+      if (historyIndex >= 0 && history[historyIndex]) {
+        redrawFromHistory(historyIndex)
+      }
+      const ctx2 = getCtx()
+      if (!ctx2) return
+      ctx2.strokeStyle = color
+      ctx2.lineWidth = lineWidth
+      ctx2.beginPath()
 
-      ctx.beginPath()
       if (tool === 'line') {
-        ctx.moveTo(startPos.x, startPos.y)
-        ctx.lineTo(pos.x, pos.y)
+        ctx2.moveTo(startPos.x, startPos.y)
+        ctx2.lineTo(pos.x, pos.y)
       } else if (tool === 'rectangle') {
-        ctx.rect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y)
+        ctx2.rect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y)
       } else if (tool === 'circle') {
         const radius = Math.sqrt(Math.pow(pos.x - startPos.x, 2) + Math.pow(pos.y - startPos.y, 2))
-        ctx.arc(startPos.x, startPos.y, radius, 0, Math.PI * 2)
+        ctx2.arc(startPos.x, startPos.y, radius, 0, Math.PI * 2)
       }
-      ctx.stroke()
+      ctx2.stroke()
     }
   }
 
@@ -161,7 +164,7 @@ export default function DrawingCanvas({ initialData, onSave }) {
 
   const handleTextSubmit = () => {
     if (!textInput.trim() || !textPos) return
-    const ctx = getContext()
+    const ctx = getCtx()
     if (!ctx) return
     ctx.font = `${lineWidth * 5}px sans-serif`
     ctx.fillStyle = color
@@ -176,23 +179,16 @@ export default function DrawingCanvas({ initialData, onSave }) {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1
       setHistoryIndex(newIndex)
-      redrawCanvas(history[newIndex])
+      redrawFromHistory(newIndex)
     }
   }
 
   const handleClear = () => {
-    const ctx = getContext()
+    const ctx = getCtx()
     if (!ctx) return
+    ctx.fillStyle = '#1e293b'
+    ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
     saveToHistory()
-    setTimeout(() => {
-      const canvas = canvasRef.current
-      if (canvas) {
-        const c = canvas.getContext('2d')
-        c.fillStyle = '#1e293b'
-        c.fillRect(0, 0, canvas.width, canvas.height)
-        saveToHistory()
-      }
-    }, 0)
   }
 
   return (
