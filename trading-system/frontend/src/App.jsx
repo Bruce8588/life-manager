@@ -184,7 +184,6 @@ function App() {
                 onClick={() => {
                   if (!editMode) {
                     setActiveTab(item.id)
-                    setSidebarOpen(false)
                   }
                 }}
               >
