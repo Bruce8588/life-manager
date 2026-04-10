@@ -17,7 +17,7 @@ const DEFAULT_PAGE_ORDER = [
   { id: 'logic-groups', label: '逻辑分组', icon: Network },
   { id: 'stocks', label: '股票管理', icon: Database },
   { id: 'models', label: '交易模型', icon: Palette },
-  { id: 'risk', label: '风险控制', icon: Shield },
+  { id: 'risk', label: '决策与风控', icon: Shield },
 ]
 
 function App() {

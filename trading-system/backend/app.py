@@ -113,6 +113,17 @@ class RiskAlert(Base):
     is_read = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class Decision(Base):
+    __tablename__ = 'decisions'
+    id = Column(Integer, primary_key=True)
+    stock_name = Column(String(100), nullable=False)
+    decision = Column(Text, nullable=False)
+    max_risk = Column(Float, default=0)
+    buy_price = Column(Float, default=0)
+    stop_loss = Column(Float, default=0)
+    position_period = Column(String(50))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 # Create tables
 Base.metadata.create_all(engine)
 
@@ -774,6 +785,63 @@ def delete_risk_alert(id):
     alert = session.query(RiskAlert).get(id)
     if alert:
         session.delete(alert)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Decisions ---
+@app.route('/api/decisions', methods=['GET'])
+def get_decisions():
+    session = Session()
+    decisions = session.query(Decision).order_by(Decision.created_at.desc()).all()
+    result = [{
+        'id': d.id,
+        'stock_name': d.stock_name,
+        'decision': d.decision,
+        'max_risk': d.max_risk,
+        'buy_price': d.buy_price,
+        'stop_loss': d.stop_loss,
+        'position_period': d.position_period,
+        'created_at': d.created_at.isoformat()
+    } for d in decisions]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/decisions', methods=['POST'])
+def create_decision():
+    data = request.json
+    session = Session()
+    decision = Decision(
+        stock_name=data['stock_name'],
+        decision=data['decision'],
+        max_risk=data.get('max_risk', 0),
+        buy_price=data.get('buy_price', 0),
+        stop_loss=data.get('stop_loss', 0),
+        position_period=data.get('position_period', '')
+    )
+    session.add(decision)
+    session.commit()
+    result = {
+        'id': decision.id,
+        'stock_name': decision.stock_name,
+        'decision': decision.decision,
+        'max_risk': decision.max_risk,
+        'buy_price': decision.buy_price,
+        'stop_loss': decision.stop_loss,
+        'position_period': decision.position_period,
+        'created_at': decision.created_at.isoformat()
+    }
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/decisions/<int:id>', methods=['DELETE'])
+def delete_decision(id):
+    session = Session()
+    decision = session.query(Decision).get(id)
+    if decision:
+        session.delete(decision)
         session.commit()
         session.close()
         return jsonify({'success': True})
