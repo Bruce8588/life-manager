@@ -3,16 +3,16 @@ import { Table, Plus, Trash2, RefreshCw, StickyNote, X } from 'lucide-react'
 
 const API = '/api'
 const TREND_COLUMNS = [
-  { key: 'up', name: '上升趋势', color: '#22c55e' },
-  { key: 'up_natural', name: '自然回撤', color: '#f97316' },
-  { key: 'up_rally', name: '回升', color: '#eab308' },
-  { key: 'up_secondary', name: '次级回撤', color: '#a855f7' },
-  { key: 'up_break', name: '上升破坏', color: '#ec4899' },
-  { key: 'down', name: '下跌趋势', color: '#ef4444' },
-  { key: 'down_natural', name: '自然回升', color: '#06b6d4' },
-  { key: 'down_rally', name: '回撤', color: '#f97316' },
-  { key: 'down_secondary', name: '次级回升', color: '#3b82f6' },
-  { key: 'down_break', name: '下跌破坏', color: '#8b5cf6' },
+  { key: 'up', name: '上升趋势', bgColor: '#22c55e20', textColor: '#22c55e' },
+  { key: 'up_natural', name: '自然回撤', bgColor: '#f9731620', textColor: '#f97316' },
+  { key: 'up_rally', name: '回升', bgColor: '#eab30820', textColor: '#eab308' },
+  { key: 'up_secondary', name: '次级回撤', bgColor: '#a855f720', textColor: '#a855f7' },
+  { key: 'up_break', name: '上升破坏', bgColor: '#ec489920', textColor: '#ec4899' },
+  { key: 'down', name: '下跌趋势', bgColor: '#ef444420', textColor: '#ef4444' },
+  { key: 'down_natural', name: '自然回升', bgColor: '#06b6d420', textColor: '#06b6d4' },
+  { key: 'down_rally', name: '回撤', bgColor: '#f9731620', textColor: '#f97316' },
+  { key: 'down_secondary', name: '次级回升', bgColor: '#3b82f620', textColor: '#3b82f6' },
+  { key: 'down_break', name: '下跌破坏', bgColor: '#8b5cf620', textColor: '#8b5cf6' },
 ]
 
 export default function MarketRecords({ stockId, stockName, onBack }) {
@@ -316,14 +316,14 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-slate-750">
-                <th className="p-3 text-left text-sm font-medium text-slate-400 border border-slate-700 sticky left-0 bg-slate-750 z-10 min-w-[100px]">日期</th>
-                <th className="p-3 text-center text-sm font-medium text-slate-400 border border-slate-700 min-w-[80px]">涨跌%</th>
+                <th className="p-3 text-left text-base font-medium text-slate-300 border border-slate-700 sticky left-0 bg-slate-750 z-10 min-w-[100px]">日期</th>
+                <th className="p-3 text-center text-base font-medium text-slate-300 border border-slate-700 min-w-[80px]">涨跌%</th>
                 {TREND_COLUMNS.map(col => (
-                  <th key={col.key} className="p-3 text-center text-sm font-medium border border-slate-700 min-w-[90px]">
-                    <span style={{ color: col.color, fontSize: '15px' }}>{col.name}</span>
+                  <th key={col.key} className="p-3 text-center text-base font-medium border border-slate-700 min-w-[90px]" style={{ backgroundColor: col.bgColor }}>
+                    <span style={{ color: col.textColor }}>{col.name}</span>
                   </th>
                 ))}
-                <th className="p-3 text-center text-sm font-medium text-slate-400 border border-slate-700 w-14">删</th>
+                <th className="p-3 text-center text-base font-medium text-slate-300 border border-slate-700 w-14">删</th>
               </tr>
             </thead>
             <tbody>
@@ -364,7 +364,7 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                           <td
                             key={col.key}
                             className="p-1 border border-slate-700 relative"
-                            style={{ backgroundColor: cellColor ? `${cellColor}25` : 'transparent' }}
+                            style={{ backgroundColor: cellColor ? `${cellColor}25` : col.bgColor }}
                           >
                             {editingCell?.recordId === record.id && editingCell?.trend === col.key ? (
                               <input
