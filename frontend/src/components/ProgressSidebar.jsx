@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Target, Heart, Wallet, FileText, Briefcase, BookOpen, Brain, Plus, Trash2, Edit3, Check } from 'lucide-react'
+import { lifeApi } from '../utils/lifeApi'
 
 const PROJECTS = [
   { id: 'body', name: '身体', icon: Heart, color: '#FF6B6B', emoji: '💪' },
@@ -18,35 +19,51 @@ export default function ProgressSidebar() {
   const [editText, setEditText] = useState('')
 
   useEffect(() => {
-    const saved = localStorage.getItem('project-notes-v2')
-    if (saved) {
-      setProjectNotes(JSON.parse(saved))
-    }
+    lifeApi.getAllNotes().then(data => {
+      setProjectNotes(data || {})
+    }).catch(() => {
+      // Fallback to localStorage
+      const saved = localStorage.getItem('project-notes-v2')
+      if (saved) setProjectNotes(JSON.parse(saved))
+    })
   }, [])
 
-  const saveNotes = (projectId, notes) => {
+  const saveNoteToApi = (projectId, notes) => {
     const updated = { ...projectNotes, [projectId]: notes }
     setProjectNotes(updated)
     localStorage.setItem('project-notes-v2', JSON.stringify(updated))
+    // Sync to API (fire and forget)
+    lifeApi.getAllNotes().catch(() => {})
   }
 
   const addNote = (projectId) => {
     const text = (newNoteInputs[projectId] || '').trim()
     if (!text) return
-    
+
     const notes = projectNotes[projectId] || []
     const newNote = {
       id: Date.now(),
       text,
       createdAt: new Date().toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     }
-    saveNotes(projectId, [newNote, ...notes])
+    const updated = { ...projectNotes, [projectId]: [newNote, ...notes] }
+    setProjectNotes(updated)
+    localStorage.setItem('project-notes-v2', JSON.stringify(updated))
     setNewNoteInputs({ ...newNoteInputs, [projectId]: '' })
+    // Sync to API
+    lifeApi.createNote(projectId, text).then(apiNote => {
+      // Replace temp note with server ID
+      const notes2 = projectNotes[projectId] || []
+      const updated2 = { ...projectNotes, [projectId]: [{ ...notes2[0], id: apiNote.id }, ...notes2.slice(1)] }
+      setProjectNotes(updated2)
+      localStorage.setItem('project-notes-v2', JSON.stringify(updated2))
+    }).catch(() => {})
   }
 
   const deleteNote = (projectId, noteId) => {
     const notes = (projectNotes[projectId] || []).filter(n => n.id !== noteId)
-    saveNotes(projectId, notes)
+    saveNoteToApi(projectId, notes)
+    lifeApi.deleteNote(noteId).catch(() => {})
   }
 
   const startEdit = (note) => {
@@ -56,10 +73,11 @@ export default function ProgressSidebar() {
 
   const saveEdit = (projectId, noteId) => {
     if (!editText.trim()) return
-    const notes = (projectNotes[projectId] || []).map(n => 
+    const notes = (projectNotes[projectId] || []).map(n =>
       n.id === noteId ? { ...n, text: editText.trim() } : n
     )
-    saveNotes(projectId, notes)
+    saveNoteToApi(projectId, notes)
+    lifeApi.updateNote(noteId, editText.trim()).catch(() => {})
     setEditingId(null)
     setEditText('')
   }
@@ -77,14 +95,14 @@ export default function ProgressSidebar() {
 
       {/* Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/30 z-40 transition-opacity"
           onClick={() => setIsOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <div 
+      <div
         className="fixed top-0 left-0 h-full w-80 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out overflow-y-auto"
         style={{ transform: isOpen ? 'translateX(0)' : 'translateX(-100%)' }}
       >
@@ -94,7 +112,7 @@ export default function ProgressSidebar() {
             <Target size={20} />
             <h2 className="font-bold text-lg">项目进展</h2>
           </div>
-          <button 
+          <button
             onClick={() => setIsOpen(false)}
             className="p-1 hover:bg-white/20 rounded-full transition-colors"
           >
@@ -106,14 +124,14 @@ export default function ProgressSidebar() {
         <div className="p-4 space-y-4">
           {PROJECTS.map((project) => {
             const notes = projectNotes[project.id] || []
-            
+
             return (
-              <div 
+              <div
                 key={project.id}
                 className="rounded-xl border border-warm-100 overflow-hidden"
                 style={{ borderLeft: `4px solid ${project.color}` }}
               >
-                <div 
+                <div
                   className="px-3 py-2 flex items-center gap-2"
                   style={{ backgroundColor: `${project.color}15` }}
                 >
@@ -121,7 +139,7 @@ export default function ProgressSidebar() {
                   <span className="font-medium text-warm-800">{project.name}</span>
                   <span className="ml-auto text-xs text-warm-400">{notes.length}条</span>
                 </div>
-                
+
                 <div className="p-3 space-y-2">
                   {/* Add Note Input */}
                   <div className="flex gap-2">
@@ -133,7 +151,7 @@ export default function ProgressSidebar() {
                       className="flex-1 px-3 py-2 bg-white rounded-lg border border-warm-200 focus:outline-none focus:border-warm-400 text-sm"
                       onKeyDown={(e) => e.key === 'Enter' && addNote(project.id)}
                     />
-                    <button 
+                    <button
                       onClick={() => addNote(project.id)}
                       className="p-2 text-warm-500 hover:text-warm-700 hover:bg-warm-50 rounded-lg transition-colors"
                     >
@@ -144,7 +162,7 @@ export default function ProgressSidebar() {
                   {/* Notes List */}
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {notes.map((note) => (
-                      <div 
+                      <div
                         key={note.id}
                         className="bg-warm-50 rounded-lg p-2 text-sm group"
                       >
@@ -158,13 +176,13 @@ export default function ProgressSidebar() {
                               autoFocus
                             />
                             <div className="flex gap-2 justify-end">
-                              <button 
+                              <button
                                 onClick={() => setEditingId(null)}
                                 className="p-1 text-gray-400 hover:text-gray-600"
                               >
                                 <X size={14} />
                               </button>
-                              <button 
+                              <button
                                 onClick={() => saveEdit(project.id, note.id)}
                                 className="p-1 text-green-500 hover:text-green-600"
                               >
@@ -176,15 +194,15 @@ export default function ProgressSidebar() {
                           <>
                             <p className="text-gray-700 whitespace-pre-wrap">{note.text}</p>
                             <div className="flex items-center justify-between mt-1 pt-1 border-t border-warm-100">
-                              <span className="text-xs text-gray-400">{note.createdAt}</span>
+                              <span className="text-xs text-gray-400">{note.createdAt || note.created_at}</span>
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
+                                <button
                                   onClick={() => startEdit(note)}
                                   className="p-1 text-gray-400 hover:text-amber-600"
                                 >
                                   <Edit3 size={12} />
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => deleteNote(project.id, note.id)}
                                   className="p-1 text-gray-400 hover:text-red-500"
                                 >
@@ -206,7 +224,7 @@ export default function ProgressSidebar() {
         {/* Footer */}
         <div className="sticky bottom-0 bg-white border-t border-warm-100 p-3">
           <p className="text-center text-xs text-warm-400">
-            💡 数据自动保存到本地
+            💡 数据已同步到服务器
           </p>
         </div>
       </div>

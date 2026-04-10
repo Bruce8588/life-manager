@@ -16,6 +16,8 @@ import {
 } from '@dnd-kit/sortable'
 import { Plus, X, Heart, Wallet, FileText, Briefcase, BookOpen, Brain, GripVertical } from 'lucide-react'
 import SortableCard from './SortableCard'
+import ProgressSidebar from './ProgressSidebar'
+import { lifeApi } from '../utils/lifeApi'
 
 const DEFAULT_PROJECTS = [
   { id: 'body', name: '身体', icon: Heart, color: '#FF6B6B', emoji: '💪' },
@@ -31,12 +33,20 @@ export default function HomePage() {
   const [projects, setProjects] = useState(DEFAULT_PROJECTS)
   const [showAdd, setShowAdd] = useState(false)
   const [newProject, setNewProject] = useState({ name: '', emoji: '📌' })
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    const saved = localStorage.getItem('life-projects')
-    if (saved) {
-      setProjects(JSON.parse(saved))
-    }
+    lifeApi.getProjects().then(data => {
+      if (data && data.length > 0) {
+        setProjects(data)
+      }
+      setLoaded(true)
+    }).catch(() => {
+      // Fallback to localStorage if API fails
+      const saved = localStorage.getItem('life-projects')
+      if (saved) setProjects(JSON.parse(saved))
+      setLoaded(true)
+    })
   }, [])
 
   const sensors = useSensors(
@@ -46,6 +56,13 @@ export default function HomePage() {
     })
   )
 
+  const saveProjects = (newProjects) => {
+    setProjects(newProjects)
+    // Sync to API (fire and forget, keep localStorage as fallback)
+    lifeApi.saveProjects(newProjects).catch(() => {})
+    localStorage.setItem('life-projects', JSON.stringify(newProjects))
+  }
+
   const handleDragEnd = (event) => {
     const { active, over } = event
     if (active.id !== over.id) {
@@ -53,7 +70,7 @@ export default function HomePage() {
         const oldIndex = items.findIndex((i) => i.id === active.id)
         const newIndex = items.findIndex((i) => i.id === over.id)
         const newItems = arrayMove(items, oldIndex, newIndex)
-        localStorage.setItem('life-projects', JSON.stringify(newItems))
+        saveProjects(newItems)
         return newItems
       })
     }
@@ -64,16 +81,14 @@ export default function HomePage() {
     const id = 'custom-' + Date.now()
     const project = { ...newProject, id, color: '#FFB347' }
     const updated = [...projects, project]
-    setProjects(updated)
-    localStorage.setItem('life-projects', JSON.stringify(updated))
+    saveProjects(updated)
     setNewProject({ name: '', emoji: '📌' })
     setShowAdd(false)
   }
 
   const handleDelete = (id) => {
     const updated = projects.filter((p) => p.id !== id)
-    setProjects(updated)
-    localStorage.setItem('life-projects', JSON.stringify(updated))
+    saveProjects(updated)
   }
 
   const handleCardClick = (project) => {
@@ -87,7 +102,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen p-6 md:p-12">
+    <>
+      <ProgressSidebar />
+      <div className="min-h-screen p-6 md:p-12">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
@@ -166,5 +183,6 @@ export default function HomePage() {
         </p>
       </div>
     </div>
+    </>
   )
 }

@@ -977,5 +977,330 @@ def delete_market_record(id):
     session.close()
     return jsonify({'error': 'Not found'}), 404
 
+
+# ============== Life Manager Database ==============
+LIFE_DB_URL = "sqlite:////root/life-manager/life_manager.db"
+life_engine = create_engine(LIFE_DB_URL, echo=False)
+life_Base = declarative_base()
+LifeSession = sessionmaker(bind=life_engine)
+
+class LifeProject(life_Base):
+    __tablename__ = 'projects'
+    id = Column(String(100), primary_key=True)
+    name = Column(String(200), nullable=False)
+    emoji = Column(String(20), default='')
+    color = Column(String(20), default='#FFB347')
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ProjectNote(life_Base):
+    __tablename__ = 'project_notes'
+    id = Column(Integer, primary_key=True)
+    project_id = Column(String(100), nullable=False)
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PsychologyHeart(life_Base):
+    __tablename__ = 'psychology_hearts'
+    id = Column(String(100), primary_key=True)
+    name = Column(String(200), nullable=False)
+    traits = Column(Text, default='')
+    tools = Column(Text, default='')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PsychologyTool(life_Base):
+    __tablename__ = 'psychology_tools'
+    id = Column(String(100), primary_key=True)
+    name = Column(String(200), nullable=False)
+    method = Column(Text, default='')
+    scenario = Column(Text, default='')
+    notes = Column(Text, default='')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Create life-manager tables
+life_Base.metadata.create_all(life_engine)
+
+# ============== Life Manager API Routes ==============
+
+# --- Projects ---
+@app.route('/api/life/projects', methods=['GET'])
+def get_life_projects():
+    session = LifeSession()
+    projects = session.query(LifeProject).order_by(LifeProject.sort_order.asc()).all()
+    result = [{
+        'id': p.id,
+        'name': p.name,
+        'emoji': p.emoji,
+        'color': p.color,
+        'sort_order': p.sort_order,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+        'updated_at': p.updated_at.isoformat() if p.updated_at else None,
+    } for p in projects]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/life/projects', methods=['POST'])
+def save_life_projects():
+    """Bulk save projects (replace all)"""
+    data = request.json
+    session = LifeSession()
+    session.query(LifeProject).delete()
+    for i, p in enumerate(data):
+        proj = LifeProject(
+            id=p['id'],
+            name=p.get('name', ''),
+            emoji=p.get('emoji', ''),
+            color=p.get('color', '#FFB347'),
+            sort_order=i
+        )
+        session.add(proj)
+    session.commit()
+    projects = session.query(LifeProject).order_by(LifeProject.sort_order.asc()).all()
+    result = [{
+        'id': p.id, 'name': p.name, 'emoji': p.emoji, 'color': p.color,
+        'sort_order': p.sort_order,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+        'updated_at': p.updated_at.isoformat() if p.updated_at else None,
+    } for p in projects]
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/life/projects/reorder', methods=['PUT'])
+def reorder_life_projects():
+    """Reorder projects"""
+    data = request.json
+    session = LifeSession()
+    for i, pid in enumerate(data):
+        proj = session.query(LifeProject).get(pid)
+        if proj:
+            proj.sort_order = i
+    session.commit()
+    projects = session.query(LifeProject).order_by(LifeProject.sort_order.asc()).all()
+    result = [{
+        'id': p.id, 'name': p.name, 'emoji': p.emoji, 'color': p.color,
+        'sort_order': p.sort_order,
+        'created_at': p.created_at.isoformat() if p.created_at else None,
+        'updated_at': p.updated_at.isoformat() if p.updated_at else None,
+    } for p in projects]
+    session.close()
+    return jsonify(result)
+
+# --- Project Notes ---
+@app.route('/api/life/notes', methods=['GET'])
+def get_project_notes():
+    project_id = request.args.get('project_id')
+    session = LifeSession()
+    if project_id:
+        notes = session.query(ProjectNote).filter_by(project_id=project_id).order_by(ProjectNote.created_at.desc()).all()
+        result = [{
+            'id': n.id, 'project_id': n.project_id, 'text': n.text,
+            'created_at': n.created_at.isoformat() if n.created_at else None,
+            'updated_at': n.updated_at.isoformat() if n.updated_at else None,
+        } for n in notes]
+        session.close()
+        return jsonify(result)
+    else:
+        all_notes = session.query(ProjectNote).order_by(ProjectNote.created_at.desc()).all()
+        result = {}
+        for n in all_notes:
+            if n.project_id not in result:
+                result[n.project_id] = []
+            result[n.project_id].append({
+                'id': n.id, 'text': n.text,
+                'created_at': n.created_at.isoformat() if n.created_at else None,
+                'updated_at': n.updated_at.isoformat() if n.updated_at else None,
+            })
+        session.close()
+        return jsonify(result)
+
+@app.route('/api/life/notes', methods=['POST'])
+def create_project_note():
+    data = request.json
+    session = LifeSession()
+    note = ProjectNote(
+        project_id=data['project_id'],
+        text=data['text']
+    )
+    session.add(note)
+    session.commit()
+    result = {
+        'id': note.id, 'project_id': note.project_id, 'text': note.text,
+        'created_at': note.created_at.isoformat() if note.created_at else None,
+        'updated_at': note.updated_at.isoformat() if note.updated_at else None,
+    }
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/life/notes/<int:id>', methods=['PUT'])
+def update_project_note(id):
+    data = request.json
+    session = LifeSession()
+    note = session.query(ProjectNote).get(id)
+    if note:
+        note.text = data.get('text', note.text)
+        session.commit()
+        result = {
+            'id': note.id, 'project_id': note.project_id, 'text': note.text,
+            'created_at': note.created_at.isoformat() if note.created_at else None,
+            'updated_at': note.updated_at.isoformat() if note.updated_at else None,
+        }
+        session.close()
+        return jsonify(result)
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/life/notes/<int:id>', methods=['DELETE'])
+def delete_project_note(id):
+    session = LifeSession()
+    note = session.query(ProjectNote).get(id)
+    if note:
+        session.delete(note)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Psychology Hearts ---
+@app.route('/api/life/hearts', methods=['GET'])
+def get_psychology_hearts():
+    session = LifeSession()
+    hearts = session.query(PsychologyHeart).all()
+    result = [{
+        'id': h.id, 'name': h.name, 'traits': h.traits, 'tools': h.tools,
+        'created_at': h.created_at.isoformat() if h.created_at else None,
+        'updated_at': h.updated_at.isoformat() if h.updated_at else None,
+    } for h in hearts]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/life/hearts', methods=['POST'])
+def create_psychology_heart():
+    data = request.json
+    session = LifeSession()
+    heart_id = data.get('id', str(datetime.utcnow().timestamp()))
+    heart = PsychologyHeart(
+        id=heart_id,
+        name=data['name'],
+        traits=data.get('traits', ''),
+        tools=data.get('tools', '')
+    )
+    session.add(heart)
+    session.commit()
+    result = {
+        'id': heart.id, 'name': heart.name, 'traits': heart.traits, 'tools': heart.tools,
+        'created_at': heart.created_at.isoformat() if heart.created_at else None,
+        'updated_at': heart.updated_at.isoformat() if heart.updated_at else None,
+    }
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/life/hearts/<heart_id>', methods=['PUT'])
+def update_psychology_heart(heart_id):
+    data = request.json
+    session = LifeSession()
+    heart = session.query(PsychologyHeart).get(heart_id)
+    if heart:
+        heart.name = data.get('name', heart.name)
+        heart.traits = data.get('traits', heart.traits)
+        heart.tools = data.get('tools', heart.tools)
+        session.commit()
+        result = {
+            'id': heart.id, 'name': heart.name, 'traits': heart.traits, 'tools': heart.tools,
+            'created_at': heart.created_at.isoformat() if heart.created_at else None,
+            'updated_at': heart.updated_at.isoformat() if heart.updated_at else None,
+        }
+        session.close()
+        return jsonify(result)
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/life/hearts/<heart_id>', methods=['DELETE'])
+def delete_psychology_heart(heart_id):
+    session = LifeSession()
+    heart = session.query(PsychologyHeart).get(heart_id)
+    if heart:
+        session.delete(heart)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+# --- Psychology Tools ---
+@app.route('/api/life/tools', methods=['GET'])
+def get_psychology_tools():
+    session = LifeSession()
+    tools = session.query(PsychologyTool).all()
+    result = [{
+        'id': t.id, 'name': t.name, 'method': t.method,
+        'scenario': t.scenario, 'notes': t.notes,
+        'created_at': t.created_at.isoformat() if t.created_at else None,
+        'updated_at': t.updated_at.isoformat() if t.updated_at else None,
+    } for t in tools]
+    session.close()
+    return jsonify(result)
+
+@app.route('/api/life/tools', methods=['POST'])
+def create_psychology_tool():
+    data = request.json
+    session = LifeSession()
+    tool_id = data.get('id', str(datetime.utcnow().timestamp()))
+    tool = PsychologyTool(
+        id=tool_id,
+        name=data['name'],
+        method=data.get('method', ''),
+        scenario=data.get('scenario', ''),
+        notes=data.get('notes', '')
+    )
+    session.add(tool)
+    session.commit()
+    result = {
+        'id': tool.id, 'name': tool.name, 'method': tool.method,
+        'scenario': tool.scenario, 'notes': tool.notes,
+        'created_at': tool.created_at.isoformat() if tool.created_at else None,
+        'updated_at': tool.updated_at.isoformat() if tool.updated_at else None,
+    }
+    session.close()
+    return jsonify(result), 201
+
+@app.route('/api/life/tools/<tool_id>', methods=['PUT'])
+def update_psychology_tool(tool_id):
+    data = request.json
+    session = LifeSession()
+    tool = session.query(PsychologyTool).get(tool_id)
+    if tool:
+        tool.name = data.get('name', tool.name)
+        tool.method = data.get('method', tool.method)
+        tool.scenario = data.get('scenario', tool.scenario)
+        tool.notes = data.get('notes', tool.notes)
+        session.commit()
+        result = {
+            'id': tool.id, 'name': tool.name, 'method': tool.method,
+            'scenario': tool.scenario, 'notes': tool.notes,
+            'created_at': tool.created_at.isoformat() if tool.created_at else None,
+            'updated_at': tool.updated_at.isoformat() if tool.updated_at else None,
+        }
+        session.close()
+        return jsonify(result)
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
+@app.route('/api/life/tools/<tool_id>', methods=['DELETE'])
+def delete_psychology_tool(tool_id):
+    session = LifeSession()
+    tool = session.query(PsychologyTool).get(tool_id)
+    if tool:
+        session.delete(tool)
+        session.commit()
+        session.close()
+        return jsonify({'success': True})
+    session.close()
+    return jsonify({'error': 'Not found'}), 404
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

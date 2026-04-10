@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Plus, Edit2, Trash2, Save, X, ChevronRight, Brain, Wrench } from 'lucide-react'
-
-const STORAGE_KEY_HEARTS = 'psychology-hearts'
-const STORAGE_KEY_TOOLS = 'psychology-tools'
+import { lifeApi } from '../utils/lifeApi'
 
 // 心影卡片详情
 function HeartDetail({ card, onBack, onEdit, onDelete }) {
@@ -15,7 +13,7 @@ function HeartDetail({ card, onBack, onEdit, onDelete }) {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-white">{card.name}</h2>
-            {card.updatedAt && <p className="text-sm text-slate-500 mt-1">更新于 {new Date(card.updatedAt).toLocaleDateString('zh-CN')}</p>}
+            {card.updated_at && <p className="text-sm text-slate-500 mt-1">更新于 {new Date(card.updated_at).toLocaleDateString('zh-CN')}</p>}
           </div>
           <div className="flex gap-2">
             <button onClick={() => onEdit(card)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
@@ -52,7 +50,7 @@ function ToolDetail({ card, onBack, onEdit, onDelete }) {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-white">{card.name}</h2>
-            {card.updatedAt && <p className="text-sm text-slate-500 mt-1">更新于 {new Date(card.updatedAt).toLocaleDateString('zh-CN')}</p>}
+            {card.updated_at && <p className="text-sm text-slate-500 mt-1">更新于 {new Date(card.updated_at).toLocaleDateString('zh-CN')}</p>}
           </div>
           <div className="flex gap-2">
             <button onClick={() => onEdit(card)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
@@ -295,44 +293,80 @@ export default function PsychologyHub() {
   const [editingTool, setEditingTool] = useState(null)
 
   useEffect(() => {
-    const h = localStorage.getItem(STORAGE_KEY_HEARTS)
-    const t = localStorage.getItem(STORAGE_KEY_TOOLS)
-    if (h) setHearts(JSON.parse(h))
-    if (t) setTools(JSON.parse(t))
+    Promise.all([lifeApi.getHearts(), lifeApi.getTools()])
+      .then(([h, t]) => {
+        setHearts(h || [])
+        setTools(t || [])
+      })
+      .catch(() => {
+        // Fallback to localStorage
+        const hs = localStorage.getItem('psychology-hearts')
+        const ts = localStorage.getItem('psychology-tools')
+        if (hs) setHearts(JSON.parse(hs))
+        if (ts) setTools(JSON.parse(ts))
+      })
   }, [])
 
-  const saveHearts = (data) => { localStorage.setItem(STORAGE_KEY_HEARTS, JSON.stringify(data)); setHearts(data) }
-  const saveTools = (data) => { localStorage.setItem(STORAGE_KEY_TOOLS, JSON.stringify(data)); setTools(data) }
+  const saveHearts = (data) => { localStorage.setItem('psychology-hearts', JSON.stringify(data)); setHearts(data) }
+  const saveTools = (data) => { localStorage.setItem('psychology-tools', JSON.stringify(data)); setTools(data) }
 
   const handleHeartSave = (form) => {
     if (editingHeart) {
-      const updated = hearts.map(h => h.id === editingHeart.id ? { ...h, ...form, updatedAt: new Date().toISOString() } : h)
-      saveHearts(updated)
+      lifeApi.updateHeart(editingHeart.id, form).then(updated => {
+        const newHearts = hearts.map(h => h.id === editingHeart.id ? updated : h)
+        saveHearts(newHearts)
+      }).catch(() => {
+        const newHearts = hearts.map(h => h.id === editingHeart.id ? { ...h, ...form, updatedAt: new Date().toISOString() } : h)
+        saveHearts(newHearts)
+      })
     } else {
-      saveHearts([...hearts, { id: Date.now().toString(), ...form, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }])
+      lifeApi.createHeart(form).then(newHeart => {
+        saveHearts([...hearts, newHeart])
+      }).catch(() => {
+        const newHeart = { id: Date.now().toString(), ...form, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        saveHearts([...hearts, newHeart])
+      })
     }
     setShowHeartForm(false); setEditingHeart(null)
   }
 
   const handleToolSave = (form) => {
     if (editingTool) {
-      const updated = tools.map(t => t.id === editingTool.id ? { ...t, ...form, updatedAt: new Date().toISOString() } : t)
-      saveTools(updated)
+      lifeApi.updateTool(editingTool.id, form).then(updated => {
+        const newTools = tools.map(t => t.id === editingTool.id ? updated : t)
+        saveTools(newTools)
+      }).catch(() => {
+        const newTools = tools.map(t => t.id === editingTool.id ? { ...t, ...form, updatedAt: new Date().toISOString() } : t)
+        saveTools(newTools)
+      })
     } else {
-      saveTools([...tools, { id: Date.now().toString(), ...form, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }])
+      lifeApi.createTool(form).then(newTool => {
+        saveTools([...tools, newTool])
+      }).catch(() => {
+        const newTool = { id: Date.now().toString(), ...form, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        saveTools([...tools, newTool])
+      })
     }
     setShowToolForm(false); setEditingTool(null)
   }
 
   const handleHeartDelete = (id) => {
     if (!confirm('确定删除？')) return
-    saveHearts(hearts.filter(h => h.id !== id))
+    lifeApi.deleteHeart(id).then(() => {
+      saveHearts(hearts.filter(h => h.id !== id))
+    }).catch(() => {
+      saveHearts(hearts.filter(h => h.id !== id))
+    })
     setView('hearts'); setActiveCard(null)
   }
 
   const handleToolDelete = (id) => {
     if (!confirm('确定删除？')) return
-    saveTools(tools.filter(t => t.id !== id))
+    lifeApi.deleteTool(id).then(() => {
+      saveTools(tools.filter(t => t.id !== id))
+    }).catch(() => {
+      saveTools(tools.filter(t => t.id !== id))
+    })
     setView('tools'); setActiveCard(null)
   }
 
