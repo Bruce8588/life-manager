@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>宏观叙事 - 分组关联方案预览</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    
+    .header { background: #1e293b; padding: 20px 40px; border-bottom: 1px solid #334155; }
+    .header h1 { font-size: 24px; font-weight: 600; color: #f8fafc; }
+    .header p { color: #94a3b8; margin-top: 4px; font-size: 14px; }
+    
+    .tabs { display: flex; gap: 12px; padding: 20px 40px; background: #1e293b; border-bottom: 1px solid #334155; flex-wrap: wrap; }
+    .tab { padding: 10px 20px; background: #334155; border: 2px solid transparent; border-radius: 8px; cursor: pointer; color: #cbd5e1; transition: all 0.2s; font-size: 14px; }
+    .tab:hover { background: #475569; }
+    .tab.active { border-color: #6366f1; background: #6366f1; color: white; }
+    
+    .content { padding: 40px; max-width: 1400px; margin: 0 auto; }
+    .section-title { font-size: 18px; color: #f8fafc; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #334155; }
+    
+    .scheme-desc { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 30px; max-width: 800px; }
+    .scheme-desc h3 { color: #f8fafc; margin-bottom: 8px; font-size: 16px; }
+    .scheme-desc p { color: #94a3b8; font-size: 13px; line-height: 1.6; }
+    
+    .memos-container { display: flex; flex-direction: column; gap: 16px; max-width: 700px; }
+    .memo-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; transition: all 0.2s; }
+    .memo-card:hover { border-color: #475569; }
+    
+    .memo-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .memo-groups { display: flex; gap: 6px; flex-wrap: wrap; }
+    .group-tag { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    
+    .memo-content { color: #cbd5e1; line-height: 1.6; margin-bottom: 12px; font-size: 14px; }
+    .memo-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid #334155; flex-wrap: wrap; gap: 8px; }
+    .memo-time { color: #64748b; font-size: 13px; }
+    .memo-actions { display: flex; gap: 8px; }
+    .btn { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; background: #334155; color: #94a3b8; font-size: 13px; transition: all 0.2s; }
+    .btn:hover { background: #475569; color: #e2e8f0; }
+    .btn.primary { background: #6366f1; color: white; }
+    .btn.primary:hover { background: #4f46e5; }
+    
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .modal { background: #1e293b; border-radius: 16px; padding: 24px; width: 460px; max-width: 90vw; border: 1px solid #334155; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-title { font-size: 16px; font-weight: 600; }
+    .modal-close { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; font-size: 20px; }
+    .modal-close:hover { color: #e2e8f0; }
+    .modal-body textarea { width: 100%; height: 100px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; color: #e2e8f0; resize: none; margin-bottom: 16px; font-family: inherit; font-size: 14px; }
+    .modal-body textarea:focus { outline: none; border-color: #6366f1; }
+    .modal-section-title { color: #94a3b8; font-size: 13px; margin-bottom: 12px; }
+    .checkbox-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+    .checkbox-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #0f172a; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    .checkbox-item:hover { background: #334155; }
+    .checkbox-item input { width: 16px; height: 16px; cursor: pointer; }
+    .checkbox-item span { flex: 1; font-size: 14px; }
+    .color-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    
+    /* Side panel */
+    .layout-b { display: grid; grid-template-columns: 1fr 280px; gap: 20px; max-width: 900px; }
+    .side-panel { background: #1e293b; border-radius: 12px; padding: 16px; border: 1px solid #334155; height: fit-content; }
+    .side-panel-title { font-size: 13px; color: #94a3b8; margin-bottom: 12px; }
+    .side-list { display: flex; flex-direction: column; gap: 6px; }
+    .side-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
+    .side-item:hover { background: #334155; }
+    .side-item.selected { background: rgba(99,102,241,0.2); border-color: #6366f1; }
+    .mini-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+    .mini-tag { padding: 2px 6px; border-radius: 10px; font-size: 10px; }
+    
+    .scheme-content { display: none; }
+    .scheme-content.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>宏观叙事 × 逻辑分组 关联方案预览</h1>
+    <p>点击下方标签切换不同设计方案</p>
+  </div>
+  
+  <div class="tabs">
+    <button class="tab active" onclick="showScheme('a')">方案 A: 弹窗多选</button>
+    <button class="tab" onclick="showScheme('b')">方案 B: 侧边栏</button>
+    <button class="tab" onclick="showScheme('c')">方案 C: 标签云内嵌</button>
+  </div>
+  
+  <div class="content">
+    <!-- 方案A -->
+    <div id="scheme-a" class="scheme-content active">
+      <div class="scheme-desc">
+        <h3>方案 A: 点击编辑 → 弹窗多选</h3>
+        <p>点击卡片右上角的编辑按钮，弹出模态框，可同时修改内容和选择多个分组。分组以 checkbox 列表形式展现，支持多选。</p>
+      </div>
+      <div class="memos-container" id="memo-list-a"></div>
+    </div>
+    
+    <!-- 方案B -->
+    <div id="scheme-b" class="scheme-content">
+      <div class="scheme-desc">
+        <h3>方案 B: 左右分栏，选中后侧边编辑</h3>
+        <p>左侧显示宏观叙事列表，点击某个叙事后，右侧显示分组选择器，可实时切换关联分组。适合需要频繁切换不同叙事查看和编辑的场景。</p>
+      </div>
+      <div class="layout-b">
+        <div class="memos-container" id="memo-list-b"></div>
+        <div class="side-panel">
+          <div class="side-panel-title">当前叙事关联的分组</div>
+          <div class="checkbox-list" id="side-checkboxes"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 方案C -->
+    <div id="scheme-c" class="scheme-content">
+      <div class="scheme-desc">
+        <h3>方案 C: 标签云式内嵌，分组显示在卡片顶部</h3>
+        <p>分组标签直接显示在每个卡片顶部，编辑时点击标签区域即可切换分组。视觉上更紧凑，适合分组数量不太多的场景。</p>
+      </div>
+      <div class="memos-container" id="memo-list-c"></div>
+    </div>
+  </div>
+  
+  <!-- Modal for A and C -->
+  <div id="modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title">编辑宏观叙事</span>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section-title">关联分组（可多选）</div>
+        <div class="checkbox-list" id="modal-checkboxes"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal()">取消</button>
+        <button class="btn primary" onclick="saveModal()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 数据
+    const groups = [
+      { id: 1, name: '电力', color: '#6366f1' },
+      { id: 2, name: '新能源', color: '#22c55e' },
+      { id: 3, name: '消费', color: '#f59e0b' },
+      { id: 4, name: '科技', color: '#3b82f6' },
+      { id: 5, name: '医药', color: '#ec4899' },
+    ];
+    
+    let memos = [
+      { id: 1, content: '美伊战争逐渐停止，伊朗获得海峡收费权，谈判可能有波动，但长期局势必定逐渐缓和。', groups: [1, 2], time: '2026-04-09 14:30' },
+      { id: 2, content: 'AI芯片出口管制升级，国产替代逻辑强化，关注算力板块机会。', groups: [4], time: '2026-04-09 12:15' },
+      { id: 3, content: '消费数据低于预期，但政策刺激预期升温，关注可选消费板块。', groups: [3, 1], time: '2026-04-09 10:00' },
+    ];
+    
+    let editingMemoId = null;
+    let editingGroups = [];
+    let selectedBId = memos[0].id;
+    
+    function getGroupStyle(groupId) {
+      const g = groups.find(x => x.id === groupId);
+      return { background: g.color + '30', color: g.color };
+    }
+    
+    function showScheme(s) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.scheme-content').forEach(c => c.classList.remove('active'));
+      document.querySelector(`[onclick="showScheme('${s}')"]`).classList.add('active');
+      document.getElementById('scheme-' + s).classList.add('active');
+      
+      if (s === 'b') renderSchemeB();
+    }
+    
+    // 渲染分组标签
+    function renderTags(groupIds) {
+      if (!groupIds || groupIds.length === 0) return '<span style="color:#64748b;font-size:12px">未分组</span>';
+      return groupIds.map(gid => {
+        const g = groups.find(x => x.id === gid);
+        return `<span class="group-tag" style="background:${g.color}30;color:${g.color}">${g.name}</span>`;
+      }).join('');
+    }
+    
+    // 渲染卡片 (A和C)
+    function renderMemoCard(memo) {
+      return `
+        <div class="memo-card">
+          <div class="memo-header">
+            <div class="memo-groups">${renderTags(memo.groups)}</div>
+            <div class="memo-actions">
+              <button class="btn" onclick="openModal(${memo.id})">编辑分组</button>
+            </div>
+          </div>
+          <div class="memo-content">${memo.content}</div>
+          <div class="memo-footer">
+            <span class="memo-time">${memo.time}</span>
+          </div>
+        </div>
+      `;
+    }
+    
+    // 方案A初始化
+    function initSchemeA() {
+      document.getElementById('memo-list-a').innerHTML = memos.map(renderMemoCard).join('');
+    }
+    
+    // 方案B
+    function renderSchemeB() {
+      const memo = memos.find(m => m.id === selectedBId);
+      
+      document.getElementById('memo-list-b').innerHTML = memos.map(m => `
+        <div class="memo-card" style="cursor:pointer;border-color:${m.id === selectedBId ? '#6366f1' : ''}" onclick="selectMemoB(${m.id})">
+          <div class="memo-groups">${renderTags(m.groups)}</div>
+          <div class="memo-content" style="margin-top:8px">${m.content}</div>
+          <div class="memo-time" style="margin-top:8px">${m.time}</div>
+        </div>
+      `).join('');
+      
+      editingGroups = [...memo.groups];
+      document.getElementById('side-checkboxes').innerHTML = groups.map(g => `
+        <label class="checkbox-item">
+          <input type="checkbox" ${editingGroups.includes(g.id) ? 'checked' : ''} onchange="toggleGroupB(${g.id})">
+          <span>${g.name}</span>
+          <span class="color-dot" style="background:${g.color}"></span>
+        </label>
+      `).join('');
+    }
+    
+    function selectMemoB(id) {
+      selectedBId = id;
+      const memo = memos.find(m => m.id === id);
+      editingGroups = [...memo.groups];
+      document.getElementById('side-checkboxes').innerHTML = groups.map(g => `
+        <label class="checkbox-item">
+          <input type="checkbox" ${editingGroups.includes(g.id) ? 'checked' : ''} onchange="toggleGroupB(${g.id})">
+          <span>${g.name}</span>
+          <span class="color-dot" style="background:${g.color}"></span>
+        </label>
+      `).join('');
+      renderSchemeB();
+    }
+    
+    function toggleGroupB(gid) {
+      if (editingGroups.includes(gid)) {
+        editingGroups = editingGroups.filter(id => id !== gid);
+      } else {
+        editingGroups.push(gid);
+      }
+      const memo = memos.find(m => m.id === selectedBId);
+      memo.groups = [...editingGroups];
+    }
+    
+    // 方案C
+    function renderSchemeC() {
+      document.getElementById('memo-list-c').innerHTML = memos.map(m => {
+        const isEditing = editingMemoId === m.id;
+        return `
+          <div class="memo-card">
+            ${isEditing ? `
+              <div class="memo-groups" style="margin-bottom:12px">
+                ${groups.map(g => `
+                  <span class="group-tag" 
+                    style="cursor:pointer;opacity:${editingGroups.includes(g.id) ? 1 : 0.3};border:${editingGroups.includes(g.id) ? '2px solid ' + g.color : '2px solid transparent'};background:${g.color}30;color:${g.color}"
+                    onclick="toggleTagC(${g.id})">${g.name}</span>
+                `).join('')}
+              </div>
+              <div class="memo-content">${m.content}</div>
+              <div class="memo-footer">
+                <span class="memo-time">${m.time}</span>
+                <div class="memo-actions">
+                  <button class="btn" onclick="closeModal()">取消</button>
+                  <button class="btn primary" onclick="saveC(${m.id})">保存</button>
+                </div>
+              </div>
+            ` : `
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+                ${m.groups.length ? renderTags(m.groups) : '<span style="color:#64748b;font-size:12px">未分组</span>'}
+              </div>
+              <div class="memo-content">${m.content}</div>
+              <div class="memo-footer">
+                <span class="memo-time">${m.time}</span>
+                <div class="memo-actions">
+                  <button class="btn" onclick="openModalC(${m.id})">编辑分组</button>
+                </div>
+              </div>
+            `}
+          </div>
+        `;
+      }).join('');
+    }
+    
+    function toggleTagC(gid) {
+      if (editingGroups.includes(gid)) {
+        editingGroups = editingGroups.filter(id => id !== gid);
+      } else {
+        editingGroups.push(gid);
+      }
+      renderSchemeC();
+    }
+    
+    function saveC(id) {
+      const memo = memos.find(m => m.id === id);
+      memo.groups = [...editingGroups];
+      editingMemoId = null;
+      editingGroups = [];
+      renderSchemeC();
+    }
+    
+    // Modal
+    function openModal(id) {
+      editingMemoId = id;
+      const memo = memos.find(m => m.id === id);
+      editingGroups = [...memo.groups];
+      document.getElementById('modal-checkboxes').innerHTML = groups.map(g => `
+        <label class="checkbox-item">
+          <input type="checkbox" ${editingGroups.includes(g.id) ? 'checked' : ''} onchange="toggleGroupModal(${g.id})">
+          <span>${g.name}</span>
+          <span class="color-dot" style="background:${g.color}"></span>
+        </label>
+      `).join('');
+      document.getElementById('modal').style.display = 'flex';
+    }
+    
+    function openModalC(id) {
+      editingMemoId = id;
+      const memo = memos.find(m => m.id === id);
+      editingGroups = [...memo.groups];
+      renderSchemeC();
+    }
+    
+    function closeModal() {
+      document.getElementById('modal').style.display = 'none';
+      if (editingMemoId && !document.getElementById('scheme-c').classList.contains('active')) {
+        editingMemoId = null;
+        editingGroups = [];
+        initSchemeA();
+      }
+    }
+    
+    function toggleGroupModal(gid) {
+      if (editingGroups.includes(gid)) {
+        editingGroups = editingGroups.filter(id => id !== gid);
+      } else {
+        editingGroups.push(gid);
+      }
+    }
+    
+    function saveModal() {
+      const memo = memos.find(m => m.id === editingMemoId);
+      memo.groups = [...editingGroups];
+      document.getElementById('modal').style.display = 'none';
+      initSchemeA();
+    }
+    
+    // 点击遮罩关闭
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+    
+    // 初始化
+    initSchemeA();
+  </script>
+</body>
+</html>

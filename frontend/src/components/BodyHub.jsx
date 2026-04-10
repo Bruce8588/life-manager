@@ -6,7 +6,7 @@ export default function BodyHub() {
       <div className="grid gap-4 md:grid-cols-2">
         {/* 饮食追踪卡片 */}
         <a 
-          href="http://8.129.109.139/diet-n8w3x/"
+          href="http://8.129.109.139:5002/"
           target="_blank"
           rel="noopener noreferrer"
           className="block bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl p-6 border border-orange-100 hover:shadow-lg hover:-translate-y-1 transition-all group"

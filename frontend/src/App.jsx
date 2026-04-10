@@ -11,7 +11,7 @@ function App() {
       <Route path="/project/:id" element={<ProjectPage />} />
       <Route path="/finance" element={<FinancePage />} />
       <Route path="/psychology" element={<PsychologyPage />} />
-      <Route path="/trading" element={<Navigate to="http://localhost:3000" />} />
+      <Route path="/trading" element={<Navigate to="/" />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   )

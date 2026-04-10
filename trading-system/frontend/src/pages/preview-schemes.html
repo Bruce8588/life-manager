@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>宏观叙事 - 分组关联方案预览</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    
+    .header { background: #1e293b; padding: 20px 40px; border-bottom: 1px solid #334155; }
+    .header h1 { font-size: 24px; font-weight: 600; color: #f8fafc; }
+    .header p { color: #94a3b8; margin-top: 4px; font-size: 14px; }
+    
+    .tabs { display: flex; gap: 12px; padding: 20px 40px; background: #1e293b; border-bottom: 1px solid #334155; flex-wrap: wrap; }
+    .tab { padding: 10px 20px; background: #334155; border: 2px solid transparent; border-radius: 8px; cursor: pointer; color: #cbd5e1; transition: all 0.2s; }
+    .tab:hover { background: #475569; }
+    .tab.active { border-color: #6366f1; background: #6366f1; color: white; }
+    
+    .content { padding: 40px; max-width: 1400px; margin: 0 auto; }
+    .section-title { font-size: 18px; color: #f8fafc; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #334155; }
+    
+    /* 模拟数据 */
+    .memos-container { display: flex; flex-direction: column; gap: 16px; max-width: 800px; }
+    .memo-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px; transition: all 0.2s; }
+    .memo-card:hover { border-color: #475569; }
+    
+    .memo-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .memo-groups { display: flex; gap: 6px; flex-wrap: wrap; }
+    .group-tag { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .group-tag.电力 { background: #6366f130; color: #818cf8; }
+    .group-tag.新能源 { background: #22c55e30; color: #4ade80; }
+    .group-tag.消费 { background: #f59e0b30; color: #fbbf24; }
+    .group-tag.科技 { background: #3b82f630; color: #60a5fa; }
+    .group-tag.医药 { background: #ec489930; color: #f472b6; }
+    
+    .memo-content { color: #cbd5e1; line-height: 1.6; margin-bottom: 12px; }
+    .memo-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid #334155; }
+    .memo-time { color: #64748b; font-size: 13px; }
+    .memo-actions { display: flex; gap: 8px; }
+    .action-btn { padding: 6px 10px; border-radius: 6px; border: none; cursor: pointer; background: #334155; color: #94a3b8; font-size: 13px; transition: all 0.2s; }
+    .action-btn:hover { background: #475569; color: #e2e8f0; }
+    .action-btn.primary { background: #6366f1; color: white; }
+    .action-btn.primary:hover { background: #4f46e5; }
+    
+    /* 方案A: 多选checkbox弹窗 */
+    .modal-overlay { position: fixed; inset: 0; background: #00000080; display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .modal { background: #1e293b; border-radius: 16px; padding: 24px; width: 480px; max-width: 90vw; border: 1px solid #334155; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-title { font-size: 18px; font-weight: 600; }
+    .modal-close { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; }
+    .modal-body textarea { width: 100%; height: 120px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px; color: #e2e8f0; resize: none; margin-bottom: 16px; font-family: inherit; }
+    .modal-body textarea:focus { outline: none; border-color: #6366f1; }
+    .modal-section-title { color: #94a3b8; font-size: 14px; margin-bottom: 12px; }
+    .checkbox-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+    .checkbox-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #0f172a; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    .checkbox-item:hover { background: #1e293b; }
+    .checkbox-item input { width: 18px; height: 18px; accent-color: #6366f1; }
+    .checkbox-item .checklabel { flex: 1; }
+    .checkbox-item .color-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    
+    /* 方案B: 侧边栏 */
+    .layout-b { display: grid; grid-template-columns: 1fr 320px; gap: 20px; max-width: 900px; }
+    .side-panel { background: #1e293b; border-radius: 12px; padding: 16px; border: 1px solid #334155; height: fit-content; }
+    .side-panel-title { font-size: 14px; color: #94a3b8; margin-bottom: 12px; }
+    .side-list { display: flex; flex-direction: column; gap: 6px; }
+    .side-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+    .side-item:hover { background: #334155; }
+    .side-item.selected { background: #6366f130; border: 1px solid #6366f1; }
+    .side-item .mini-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+    .side-item .mini-tag { padding: 2px 6px; border-radius: 10px; font-size: 10px; }
+    
+    /* 方案C: 标签云卡片 */
+    .memo-card-c { position: relative; }
+    .memo-card-c .group-tags-overlay { position: absolute; top: 12px; left: 12px; right: 60px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .memo-card-c .memo-body { padding-top: 40px; }
+    
+    .scheme-description { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 30px; max-width: 800px; }
+    .scheme-description h3 { color: #f8fafc; margin-bottom: 8px; }
+    .scheme-description p { color: #94a3b8; font-size: 14px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState } = React;
+    const { Plus, Edit2, Trash2, X, Check } = lucideReact;
+    
+    // 模拟数据
+    const mockGroups = [
+      { id: 1, name: '电力', color: '#6366f1' },
+      { id: 2, name: '新能源', color: '#22c55e' },
+      { id: 3, name: '消费', color: '#f59e0b' },
+      { id: 4, name: '科技', color: '#3b82f6' },
+      { id: 5, name: '医药', color: '#ec4899' },
+    ];
+    
+    const mockMemos = [
+      { id: 1, content: '美伊战争逐渐停止，伊朗获得海峡收费权，谈判可能有波动，但长期局势必定逐渐缓和。不过世界经济增速26年必然要放缓了。', groups: [1, 2], time: '2026-04-09 14:30' },
+      { id: 2, content: 'AI芯片出口管制升级，国产替代逻辑强化，关注算力板块机会。', groups: [4], time: '2026-04-09 12:15' },
+      { id: 3, content: '消费数据低于预期，但政策刺激预期升温，关注可选消费板块。', groups: [3, 1], time: '2026-04-09 10:00' },
+    ];
+    
+    // 方案A: 弹窗多选
+    function SchemeA() {
+      const [memos, setMemos] = useState(mockMemos);
+      const [editingMemo, setEditingMemo] = useState(null);
+      const [selectedGroups, setSelectedGroups] = useState([]);
+      const [newContent, setNewContent] = useState('');
+      
+      const openEditor = (memo) => {
+        setEditingMemo(memo);
+        setSelectedGroups(memo ? [...memo.groups] : []);
+        setNewContent(memo ? memo.content : '');
+      };
+      
+      const closeEditor = () => {
+        setEditingMemo(null);
+        setSelectedGroups([]);
+        setNewContent('');
+      };
+      
+      const toggleGroup = (groupId) => {
+        setSelectedGroups(prev => 
+          prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+        );
+      };
+      
+      const save = () => {
+        if (editingMemo) {
+          setMemos(prev => prev.map(m => m.id === editingMemo.id ? { ...m, groups: selectedGroups, content: newContent } : m));
+        }
+        closeEditor();
+      };
+      
+      const getGroupStyle = (groupId) => {
+        const g = mockGroups.find(x => x.id === groupId);
+        return { background: g.color + '30', color: g.color };
+      };
+      
+      return (
+        <div>
+          <div className="scheme-description">
+            <h3>方案 A: 点击编辑 → 弹窗多选</h3>
+            <p>点击卡片右上角的编辑按钮，弹出模态框，可同时修改内容和选择多个分组。分组以 checkbox 列表形式展现，支持多选。</p>
+          </div>
+          
+          <div className="memos-container">
+            {memos.map(memo => (
+              <div key={memo.id} className="memo-card">
+                <div className="memo-header">
+                  <div className="memo-groups">
+                    {memo.groups.map(gid => {
+                      const g = mockGroups.find(x => x.id === gid);
+                      return <span key={gid} className="group-tag" style={getGroupStyle(gid)}>{g.name}</span>;
+                    })}
+                  </div>
+                  <div className="memo-actions">
+                    <button className="action-btn" onClick={() => openEditor(memo)}><Edit2 size={14} /> 编辑</button>
+                  </div>
+                </div>
+                <div className="memo-content">{memo.content}</div>
+                <div className="memo-footer">
+                  <span className="memo-time">{memo.time}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {editingMemo !== null && (
+            <div className="modal-overlay" onClick={closeEditor}>
+              <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <span className="modal-title">编辑宏观叙事</span>
+                  <button className="modal-close" onClick={closeEditor}><X size={20} /></button>
+                </div>
+                <div className="modal-body">
+                  <div className="modal-section-title">内容</div>
+                  <textarea value={newContent} onChange={e => setNewContent(e.target.value)} placeholder="记录你的市场观点..." />
+                  
+                  <div className="modal-section-title">关联分组（可多选）</div>
+                  <div className="checkbox-list">
+                    {mockGroups.map(g => (
+                      <label key={g.id} className="checkbox-item">
+                        <input type="checkbox" checked={selectedGroups.includes(g.id)} onChange={() => toggleGroup(g.id)} />
+                        <span className="checklabel">{g.name}</span>
+                        <span className="color-dot" style={{ background: g.color }} />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="action-btn" onClick={closeEditor}>取消</button>
+                  <button className="action-btn primary" onClick={save}><Check size={14} /> 保存</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // 方案B: 侧边栏
+    function SchemeB() {
+      const [memos] = useState(mockMemos);
+      const [selectedMemo, setSelectedMemo] = useState(memos[0]);
+      const [selectedGroups, setSelectedGroups] = useState(memos[0].groups);
+      
+      const toggleGroup = (groupId) => {
+        setSelectedGroups(prev => 
+          prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+        );
+      };
+      
+      const getGroupStyle = (groupId) => {
+        const g = mockGroups.find(x => x.id === groupId);
+        return { background: g.color + '30', color: g.color };
+      };
+      
+      return (
+        <div>
+          <div className="scheme-description">
+            <h3>方案 B: 左右分栏，选中后侧边编辑</h3>
+            <p>左侧显示宏观叙事列表，点击某个叙事后，右侧显示分组选择器，可实时切换关联分组。适合需要频繁切换不同叙事查看和编辑的场景。</p>
+          </div>
+          
+          <div className="layout-b">
+            <div className="memos-container">
+              {memos.map(memo => (
+                <div key={memo.id} 
+                     className="memo-card" 
+                     style={{ borderColor: selectedMemo.id === memo.id ? '#6366f1' : '', cursor: 'pointer' }}
+                     onClick={() => { setSelectedMemo(memo); setSelectedGroups([...memo.groups]); }}>
+                  <div className="memo-groups">
+                    {memo.groups.map(gid => {
+                      const g = mockGroups.find(x => x.id === gid);
+                      return <span key={gid} className="group-tag" style={getGroupStyle(gid)}>{g.name}</span>;
+                    })}
+                  </div>
+                  <div className="memo-content" style={{ marginTop: 8 }}>{memo.content}</div>
+                  <div className="memo-time" style={{ marginTop: 8 }}>{memo.time}</div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="side-panel">
+              <div className="side-panel-title">当前叙事关联的分组</div>
+              <div className="checkbox-list">
+                {mockGroups.map(g => (
+                  <label key={g.id} className="checkbox-item">
+                    <input type="checkbox" checked={selectedGroups.includes(g.id)} onChange={() => toggleGroup(g.id)} />
+                    <span className="checklabel">{g.name}</span>
+                    <span className="color-dot" style={{ background: g.color }} />
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // 方案C: 标签云内嵌
+    function SchemeC() {
+      const [memos, setMemos] = useState(mockMemos);
+      const [editingMemo, setEditingMemo] = useState(null);
+      const [selectedGroups, setSelectedGroups] = useState([]);
+      
+      const openEditor = (memo) => {
+        setEditingMemo(memo);
+        setSelectedGroups([...memo.groups]);
+      };
+      
+      const closeEditor = () => {
+        setEditingMemo(null);
+        setSelectedGroups([]);
+      };
+      
+      const toggleGroup = (groupId) => {
+        setSelectedGroups(prev => 
+          prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+        );
+      };
+      
+      const save = () => {
+        if (editingMemo) {
+          setMemos(prev => prev.map(m => m.id === editingMemo.id ? { ...m, groups: selectedGroups } : m));
+        }
+        closeEditor();
+      };
+      
+      const getGroupStyle = (groupId) => {
+        const g = mockGroups.find(x => x.id === groupId);
+        return { background: g.color + '30', color: g.color };
+      };
+      
+      return (
+        <div>
+          <div className="scheme-description">
+            <h3>方案 C: 标签云式内嵌，分组显示在卡片顶部</h3>
+            <p>分组标签直接显示在每个卡片顶部，编辑时点击标签区域即可切换分组。视觉上更紧凑，适合分组数量不太多的场景。</p>
+          </div>
+          
+          <div className="memos-container">
+            {memos.map(memo => (
+              <div key={memo.id} className="memo-card memo-card-c">
+                {editingMemo?.id === memo.id ? (
+                  <>
+                    <div className="memo-groups" style={{ marginBottom: 12 }}>
+                      {mockGroups.map(g => (
+                        <span key={g.id} 
+                              className="group-tag" 
+                              style={{ 
+                                ...getGroupStyle(g.id), 
+                                cursor: 'pointer',
+                                opacity: selectedGroups.includes(g.id) ? 1 : 0.3,
+                                border: selectedGroups.includes(g.id) ? `2px solid ${g.color}` : '2px solid transparent'
+                              }}
+                              onClick={() => toggleGroup(g.id)}>
+                          {g.name}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="memo-content">{memo.content}</div>
+                    <div className="memo-footer">
+                      <span className="memo-time">{memo.time}</span>
+                      <div className="memo-actions">
+                        <button className="action-btn" onClick={closeEditor}>取消</button>
+                        <button className="action-btn primary" onClick={save}><Check size={14} /> 保存</button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="group-tags-overlay">
+                      {memo.groups.map(gid => {
+                        const g = mockGroups.find(x => x.id === gid);
+                        return <span key={gid} className="group-tag" style={getGroupStyle(gid)}>{g.name}</span>;
+                      })}
+                      {memo.groups.length === 0 && <span style={{ color: '#64748b', fontSize: 12 }}>未分组</span>}
+                    </div>
+                    <div className="memo-body">
+                      <div className="memo-content">{memo.content}</div>
+                      <div className="memo-footer">
+                        <span className="memo-time">{memo.time}</span>
+                        <div className="memo-actions">
+                          <button className="action-btn" onClick={() => openEditor(memo)}><Edit2 size={14} /> 编辑分组</button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    // 主应用
+    function App() {
+      const [activeTab, setActiveTab] = useState('a');
+      
+      return (
+        <div>
+          <div className="header">
+            <h1>📋 宏观叙事 × 逻辑分组 关联方案预览</h1>
+            <p>点击下方标签切换不同设计方案</p>
+          </div>
+          
+          <div className="tabs">
+            <button className={`tab ${activeTab === 'a' ? 'active' : ''}`} onClick={() => setActiveTab('a')}>方案 A: 弹窗多选</button>
+            <button className={`tab ${activeTab === 'b' ? 'active' : ''}`} onClick={() => setActiveTab('b')}>方案 B: 侧边栏</button>
+            <button className={`tab ${activeTab === 'c' ? 'active' : ''}`} onClick={() => setActiveTab('c')}>方案 C: 标签云内嵌</button>
+          </div>
+          
+          <div className="content">
+            {activeTab === 'a' && <SchemeA />}
+            {activeTab === 'b' && <SchemeB />}
+            {activeTab === 'c' && <SchemeC />}
+          </div>
+        </div>
+      );
+    }
+    
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
