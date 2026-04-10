@@ -25,20 +25,18 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
   const [editValue, setEditValue] = useState('')
   const [showNoteModal, setShowNoteModal] = useState(null)
   const loadingRef = useRef(false)
+  const addLoadingRef = useRef(false)
 
-  // Initial load
   useEffect(() => {
     loadStocks()
   }, [])
 
-  // Auto-select from props
   useEffect(() => {
     if (stockId) {
       setSelectedStockId(stockId)
     }
   }, [stockId])
 
-  // Load records when stock changes
   useEffect(() => {
     if (selectedStockId) {
       loadRecords(selectedStockId)
@@ -52,7 +50,6 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
       const res = await fetch(`${API}/stocks`)
       const data = await res.json()
       setStocks(data)
-      // Auto-select first stock if none selected
       if (!selectedStockId && data.length > 0) {
         setSelectedStockId(data[0].id)
       }
@@ -77,8 +74,21 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
   }
 
   const addRecord = async () => {
-    if (!selectedStockId) return
+    if (!selectedStockId || addLoadingRef.current) return
+    addLoadingRef.current = true
+    
     const today = new Date().toISOString().split('T')[0]
+    const newRecord = {
+      id: Date.now(), // temporary id
+      stock_id: selectedStockId,
+      date: today,
+      data: {},
+      created_at: new Date().toISOString()
+    }
+    
+    // Immediately add to local state for fast feedback
+    setRecords(prev => [newRecord, ...prev])
+    
     try {
       const res = await fetch(`${API}/market-records`, {
         method: 'POST',
@@ -89,22 +99,22 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
           data: {}
         })
       })
-      const newRecord = await res.json()
-      // Immediately add to local state
-      setRecords(prev => {
-        const exists = prev.find(r => r.id === newRecord.id)
-        if (exists) return prev
-        return [newRecord, ...prev]
-      })
+      const savedRecord = await res.json()
+      // Replace temp record with real one
+      setRecords(prev => prev.map(r => r.id === newRecord.id ? savedRecord : r))
     } catch (err) {
       console.error('Failed to add record:', err)
+      // Remove temp record on error
+      setRecords(prev => prev.filter(r => r.id !== newRecord.id))
     }
+    addLoadingRef.current = false
   }
 
   const deleteRecord = async (id) => {
+    // Optimistic delete
+    setRecords(prev => prev.filter(r => r.id !== id))
     try {
       await fetch(`${API}/market-records/${id}`, { method: 'DELETE' })
-      setRecords(prev => prev.filter(r => r.id !== id))
     } catch (err) {
       console.error('Failed to delete record:', err)
     }
@@ -179,7 +189,6 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
     return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', weekday: 'short' })
   }
 
-  // Group stocks
   const stocksByGroup = {}
   stocks.forEach(stock => {
     const groupId = stock.logic_group_id || 'ungrouped'
@@ -236,9 +245,8 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
         </div>
       </div>
 
-      {/* Stock Selector - Two Row */}
+      {/* Stock Selector */}
       <div className="mb-4 bg-slate-800 rounded-lg border border-slate-700 p-3">
-        {/* Row 1: Groups */}
         <div className="flex items-center gap-2 flex-wrap mb-2">
           <span className="text-slate-400 text-sm mr-2">分组：</span>
           <button
@@ -262,7 +270,6 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
           })}
         </div>
 
-        {/* Row 2: Stocks in selected group */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-slate-400 text-sm mr-2">股票：</span>
           {(selectedGroupId === null ? stocks : stocksByGroup[selectedGroupId]?.stocks || []).map(stock => (
@@ -309,20 +316,20 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-slate-750">
-                <th className="p-2 text-left text-xs font-medium text-slate-400 border border-slate-700 sticky left-0 bg-slate-750 z-10 min-w-[80px]">日期</th>
-                <th className="p-2 text-center text-xs font-medium text-slate-400 border border-slate-700 min-w-[60px]">涨跌%</th>
+                <th className="p-3 text-left text-sm font-medium text-slate-400 border border-slate-700 sticky left-0 bg-slate-750 z-10 min-w-[100px]">日期</th>
+                <th className="p-3 text-center text-sm font-medium text-slate-400 border border-slate-700 min-w-[80px]">涨跌%</th>
                 {TREND_COLUMNS.map(col => (
-                  <th key={col.key} className="p-2 text-center text-xs font-medium border border-slate-700 min-w-[70px]">
-                    <span style={{ color: col.color }}>{col.name}</span>
+                  <th key={col.key} className="p-3 text-center text-sm font-medium border border-slate-700 min-w-[90px]">
+                    <span style={{ color: col.color, fontSize: '15px' }}>{col.name}</span>
                   </th>
                 ))}
-                <th className="p-2 text-center text-xs font-medium text-slate-400 border border-slate-700 w-12">删</th>
+                <th className="p-3 text-center text-sm font-medium text-slate-400 border border-slate-700 w-14">删</th>
               </tr>
             </thead>
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="p-8 text-center text-slate-500 text-sm">
+                  <td colSpan={12} className="p-8 text-center text-slate-500 text-base">
                     {selectedStockId ? '暂无记录，点击"新增行"开始' : '请先选择股票'}
                   </td>
                 </tr>
@@ -336,16 +343,16 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
 
                   return (
                     <tr key={record.id} className="hover:bg-slate-700/50">
-                      <td className="p-1 border border-slate-700 sticky left-0 bg-slate-800 z-10">
-                        <span className="text-white text-sm font-medium pl-1">{formatDate(record.date)}</span>
+                      <td className="p-3 border border-slate-700 sticky left-0 bg-slate-800 z-10">
+                        <span className="text-white text-base font-medium">{formatDate(record.date)}</span>
                       </td>
-                      <td className="p-1 border border-slate-700 text-center">
+                      <td className="p-3 border border-slate-700 text-center">
                         {percentChange !== null ? (
-                          <span className={`text-xs font-medium ${parseFloat(percentChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          <span className={`text-base font-medium ${parseFloat(percentChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {parseFloat(percentChange) >= 0 ? '↑' : '↓'} {Math.abs(percentChange)}%
                           </span>
                         ) : (
-                          <span className="text-slate-600 text-xs">-</span>
+                          <span className="text-slate-600">-</span>
                         )}
                       </td>
                       {TREND_COLUMNS.map(col => {
@@ -356,14 +363,14 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                         return (
                           <td
                             key={col.key}
-                            className="p-0.5 border border-slate-700 relative"
+                            className="p-1 border border-slate-700 relative"
                             style={{ backgroundColor: cellColor ? `${cellColor}25` : 'transparent' }}
                           >
                             {editingCell?.recordId === record.id && editingCell?.trend === col.key ? (
                               <input
                                 type="number"
                                 step="0.01"
-                                className="w-full bg-slate-600 text-white rounded px-1 py-1 text-center text-sm focus:outline-none"
+                                className="w-full bg-slate-600 text-white rounded px-1 py-2 text-center text-base focus:outline-none"
                                 value={editValue}
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onBlur={() => updateCell(record.id, col.key, parseFloat(editValue) || null)}
@@ -374,9 +381,9 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                                 autoFocus
                               />
                             ) : (
-                              <div className="flex items-center justify-center gap-0.5">
+                              <div className="flex items-center justify-center gap-1">
                                 <span
-                                  className="py-1 cursor-pointer hover:bg-slate-600/50 rounded w-full text-center text-white text-sm"
+                                  className="py-2 cursor-pointer hover:bg-slate-600/50 rounded w-full text-center text-white text-base"
                                   onClick={() => {
                                     setEditingCell({ recordId: record.id, trend: col.key })
                                     setEditValue(cellValue ?? '')
@@ -386,10 +393,10 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                                 </span>
                                 {cellData.note && (
                                   <button
-                                    className="p-0.5 text-yellow-400 hover:text-yellow-300"
+                                    className="p-1 text-yellow-400 hover:text-yellow-300"
                                     onClick={() => setShowNoteModal({ recordId: record.id, trend: col.key })}
                                   >
-                                    <StickyNote size={11} />
+                                    <StickyNote size={14} />
                                   </button>
                                 )}
                               </div>
@@ -397,13 +404,13 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                           </td>
                         )
                       })}
-                      <td className="p-1 border border-slate-700 text-center">
+                      <td className="p-2 border border-slate-700 text-center">
                         <button
                           onClick={() => deleteRecord(record.id)}
-                          className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-colors"
+                          className="p-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-colors"
                           title="删除"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={16} />
                         </button>
                       </td>
                     </tr>
@@ -422,23 +429,23 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNoteModal(null)}>
             <div className="bg-slate-800 rounded-lg p-5 w-80 border border-slate-700" onClick={e => e.stopPropagation()}>
-              <h3 className="text-base font-semibold text-white mb-3">
+              <h3 className="text-lg font-semibold text-white mb-3">
                 笔记 - {TREND_COLUMNS.find(c => c.key === showNoteModal.trend)?.name}
               </h3>
               <textarea
                 id="noteText"
-                className="w-full bg-slate-700 text-white rounded px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm"
+                className="w-full bg-slate-700 text-white rounded px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 rows={3}
                 placeholder="输入笔记..."
                 defaultValue={cellData.note || ''}
               />
               <div className="mt-3">
-                <label className="block text-xs text-slate-400 mb-1">颜色</label>
-                <div className="flex gap-1.5 flex-wrap">
+                <label className="block text-sm text-slate-400 mb-1">颜色</label>
+                <div className="flex gap-2">
                   {['', '#22c55e', '#ef4444', '#3b82f6', '#eab308', '#8b5cf6', '#f97316', '#ec4899'].map(c => (
                     <button
                       key={c || 'none'}
-                      className={`w-6 h-6 rounded ${!c ? 'border border-slate-500' : ''}`}
+                      className={`w-7 h-7 rounded ${!c ? 'border-2 border-slate-500' : ''}`}
                       style={c ? { backgroundColor: c } : {}}
                       onClick={() => {
                         const note = document.getElementById('noteText').value
@@ -449,7 +456,7 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <button onClick={() => setShowNoteModal(null)} className="px-3 py-1.5 text-slate-400 hover:text-white text-sm">
+                <button onClick={() => setShowNoteModal(null)} className="px-4 py-2 text-slate-400 hover:text-white">
                   取消
                 </button>
                 <button
@@ -457,7 +464,7 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
                     const note = document.getElementById('noteText').value
                     updateNote(showNoteModal.recordId, showNoteModal.trend, note, cellData.color || null)
                   }}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-sm"
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded"
                 >
                   保存
                 </button>

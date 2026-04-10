@@ -26,7 +26,7 @@ const DEFAULT_PAGE_ORDER = [
 
 function App() {
   const [activeTab, setActiveTab] = useState('market')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false) // Hidden by default on mobile
   const [initialStockId, setInitialStockId] = useState(() => {
     const saved = sessionStorage.getItem(PENDING_STOCK_KEY)
     if (saved) {
@@ -128,9 +128,9 @@ function App() {
 
   return (
     <div className="flex h-screen bg-slate-900">
-      {/* Mobile menu button */}
+      {/* Sidebar Toggle Button (always visible) */}
       <button
-        className="fixed top-4 left-4 z-50 md:hidden bg-slate-800 p-2 rounded-lg"
+        className="fixed top-4 left-4 z-50 bg-slate-800 p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
@@ -141,7 +141,7 @@ function App() {
         fixed md:static inset-y-0 left-0 z-40
         w-64 bg-slate-800 border-r border-slate-700
         transform transition-transform duration-200 ease-in-out
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
