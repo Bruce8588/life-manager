@@ -1,9 +1,28 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import PsychologyHub from './PsychologyHub'
 
 export default function ProjectPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+
+  // 心理板块使用深色背景
+  if (id === 'psychology') {
+    return (
+      <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+        <div className="p-6 md:p-12">
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            返回首页
+          </button>
+          <PsychologyHub />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen p-6 md:p-12">
