@@ -26,7 +26,6 @@ export default function DrawingCanvas({ initialData, onSave }) {
   const [startPos, setStartPos] = useState(null)
   const [textInput, setTextInput] = useState('')
   const [textPos, setTextPos] = useState(null)
-  const lastPosRef = useRef(null)
 
   // Initialize canvas
   useEffect(() => {
@@ -46,10 +45,6 @@ export default function DrawingCanvas({ initialData, onSave }) {
     } else {
       saveToHistory()
     }
-  }, [])
-
-  const getCtx = useCallback(() => {
-    return canvasRef.current?.getContext('2d')
   }, [])
 
   const saveToHistory = useCallback(() => {
@@ -98,7 +93,6 @@ export default function DrawingCanvas({ initialData, onSave }) {
     e.preventDefault()
     const pos = getPos(e)
     setStartPos(pos)
-    lastPosRef.current = pos
     setIsDrawing(true)
 
     if (tool === 'text') {
@@ -106,49 +100,30 @@ export default function DrawingCanvas({ initialData, onSave }) {
       return
     }
 
-    const ctx = getCtx()
+    const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) return
 
     ctx.beginPath()
-    ctx.moveTo(pos.x, pos.y)
     ctx.strokeStyle = tool === 'eraser' ? '#1e293b' : color
     ctx.lineWidth = tool === 'eraser' ? lineWidth * 3 : lineWidth
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
+
+    if (tool === 'brush' || tool === 'eraser') {
+      ctx.moveTo(pos.x, pos.y)
+    }
   }
 
   const handleMove = (e) => {
-    if (!isDrawing || tool === 'text') return
+    if (!isDrawing || tool === 'text' || !startPos) return
     e.preventDefault()
     const pos = getPos(e)
-    const ctx = getCtx()
+    const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) return
 
     if (tool === 'brush' || tool === 'eraser') {
       ctx.lineTo(pos.x, pos.y)
       ctx.stroke()
-      lastPosRef.current = pos
-    } else if (tool === 'line' || tool === 'rectangle' || tool === 'circle') {
-      // Restore from history and draw preview
-      if (historyIndex >= 0 && history[historyIndex]) {
-        redrawFromHistory(historyIndex)
-      }
-      const ctx2 = getCtx()
-      if (!ctx2) return
-      ctx2.strokeStyle = color
-      ctx2.lineWidth = lineWidth
-      ctx2.beginPath()
-
-      if (tool === 'line') {
-        ctx2.moveTo(startPos.x, startPos.y)
-        ctx2.lineTo(pos.x, pos.y)
-      } else if (tool === 'rectangle') {
-        ctx2.rect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y)
-      } else if (tool === 'circle') {
-        const radius = Math.sqrt(Math.pow(pos.x - startPos.x, 2) + Math.pow(pos.y - startPos.y, 2))
-        ctx2.arc(startPos.x, startPos.y, radius, 0, Math.PI * 2)
-      }
-      ctx2.stroke()
     }
   }
 
@@ -158,13 +133,38 @@ export default function DrawingCanvas({ initialData, onSave }) {
       setIsDrawing(false)
       return
     }
+    
+    const pos = getPos(e)
+    const ctx = canvasRef.current?.getContext('2d')
+    if (!ctx || !startPos) return
+
+    ctx.strokeStyle = tool === 'eraser' ? '#1e293b' : color
+    ctx.lineWidth = tool === 'eraser' ? lineWidth * 3 : lineWidth
+
+    if (tool === 'line') {
+      ctx.beginPath()
+      ctx.moveTo(startPos.x, startPos.y)
+      ctx.lineTo(pos.x, pos.y)
+      ctx.stroke()
+    } else if (tool === 'rectangle') {
+      ctx.beginPath()
+      ctx.rect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y)
+      ctx.stroke()
+    } else if (tool === 'circle') {
+      const radius = Math.sqrt(Math.pow(pos.x - startPos.x, 2) + Math.pow(pos.y - startPos.y, 2))
+      ctx.beginPath()
+      ctx.arc(startPos.x, startPos.y, radius, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+
     setIsDrawing(false)
+    setStartPos(null)
     saveToHistory()
   }
 
   const handleTextSubmit = () => {
     if (!textInput.trim() || !textPos) return
-    const ctx = getCtx()
+    const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) return
     ctx.font = `${lineWidth * 5}px sans-serif`
     ctx.fillStyle = color
@@ -184,10 +184,11 @@ export default function DrawingCanvas({ initialData, onSave }) {
   }
 
   const handleClear = () => {
-    const ctx = getCtx()
-    if (!ctx) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
     ctx.fillStyle = '#1e293b'
-    ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
     saveToHistory()
   }
 
