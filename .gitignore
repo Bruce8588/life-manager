@@ -38,3 +38,4 @@ npm-debug.log*
 venv/
 env/
 .env
+__pycache__/
