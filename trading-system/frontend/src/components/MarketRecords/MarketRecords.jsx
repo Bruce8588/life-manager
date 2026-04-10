@@ -228,64 +228,62 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
         </div>
       </div>
 
-      {/* Stock Group Selector */}
+      {/* Stock Group Selector - Horizontal */}
       <div className="mb-4 bg-slate-800 rounded-lg border border-slate-700 p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-slate-400 text-sm">按分组选择股票：</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-slate-400 text-sm mr-2">分组：</span>
+          {/* All stocks button */}
           <button
-            onClick={() => setSelectedGroupId(null)}
-            className={`px-3 py-1 rounded text-sm ${!selectedGroupId ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+            onClick={() => {
+              setSelectedGroupId(null)
+              if (stocks.length > 0) setSelectedStockId(stocks[0].id)
+            }}
+            className={`px-3 py-1.5 rounded text-sm ${!selectedGroupId ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
           >
-            全部
+            全部 ({stocks.length})
           </button>
-        </div>
-        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {/* Group buttons */}
           {Object.entries(stocksByGroup).map(([groupId, group]) => {
-            const isCollapsed = collapsedGroups[groupId]
             const isSelected = selectedGroupId === (groupId === 'ungrouped' ? null : parseInt(groupId))
+            const isCollapsed = collapsedGroups[groupId]
             
             return (
-              <div key={groupId}>
-                <div 
-                  className={`flex items-center gap-2 p-2 rounded cursor-pointer ${isSelected ? 'bg-slate-700' : 'hover:bg-slate-700/50'}`}
-                  style={{ paddingLeft: '8px' }}
-                >
-                  <button
-                    onClick={() => toggleGroupCollapse(groupId)}
-                    className="p-1 text-slate-400 hover:text-white"
-                  >
-                    {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const gid = groupId === 'ungrouped' ? null : parseInt(groupId)
+              <div key={groupId} className="relative">
+                <button
+                  onClick={() => {
+                    const gid = groupId === 'ungrouped' ? null : parseInt(groupId)
+                    if (selectedGroupId === gid) {
+                      // Toggle collapse
+                      toggleGroupCollapse(groupId)
+                    } else {
                       setSelectedGroupId(gid)
-                      // Select first stock in group
                       if (group.stocks.length > 0) {
                         setSelectedStockId(group.stocks[0].id)
                       }
-                    }}
-                    className="flex items-center gap-2 flex-1"
-                  >
-                    <span 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: group.color }}
-                    />
-                    <span className="text-slate-300 text-sm">{group.name}</span>
-                    <span className="text-slate-500 text-xs">({group.stocks.length})</span>
-                  </button>
-                </div>
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded text-sm flex items-center gap-2 ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                >
+                  <span 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: group.color }}
+                  />
+                  <span>{group.name}</span>
+                  <span className="text-xs opacity-70">({group.stocks.length})</span>
+                </button>
                 
-                {!isCollapsed && (
-                  <div className="pl-6 space-y-1 mt-1">
+                {/* Dropdown with stocks */}
+                {isSelected && !isCollapsed && (
+                  <div className="absolute top-full left-0 mt-1 bg-slate-700 rounded-lg border border-slate-600 p-2 min-w-[150px] z-20 shadow-lg">
+                    <div className="text-xs text-slate-400 mb-2 px-2">选择股票：</div>
                     {group.stocks.map(stock => (
                       <button
                         key={stock.id}
                         onClick={() => setSelectedStockId(stock.id)}
-                        className={`w-full text-left px-3 py-2 rounded text-sm flex items-center gap-2 ${
+                        className={`w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 ${
                           selectedStockId === stock.id 
-                            ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50' 
-                            : 'text-slate-300 hover:bg-slate-700'
+                            ? 'bg-indigo-600/50 text-indigo-200' 
+                            : 'text-slate-300 hover:bg-slate-600'
                         }`}
                       >
                         <span>{stock.name}</span>
@@ -298,6 +296,29 @@ export default function MarketRecords({ stockId, stockName, onBack }) {
             )
           })}
         </div>
+        
+        {/* Show all stocks in selected group as pills when collapsed */}
+        {selectedGroupId !== null && collapsedGroups[selectedGroupId?.toString()] && (() => {
+          const groupData = stocksByGroup[selectedGroupId?.toString()]
+          if (!groupData) return null
+          return (
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {groupData.stocks.map(stock => (
+                <button
+                  key={stock.id}
+                  onClick={() => setSelectedStockId(stock.id)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    selectedStockId === stock.id 
+                      ? 'bg-indigo-600 text-white' 
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  {stock.name}
+                </button>
+              ))}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Current Stock */}
