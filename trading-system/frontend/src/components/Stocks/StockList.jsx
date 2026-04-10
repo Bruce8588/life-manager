@@ -299,10 +299,21 @@ export default function StockList({ initialGroupId = null, initialStockId = null
       })
     }
     setInlineEdit({ field: null, value: '' })
+    // Update selectedStock directly with the new values before fetching
+    let newFieldValues = stock.field_values || {}
+    if (field === 'name') {
+      setSelectedStock({ ...stock, name: value })
+    } else if (field === 'code') {
+      setSelectedStock({ ...stock, code: value })
+    } else if (field === 'notes') {
+      setSelectedStock({ ...stock, notes: value })
+    } else if (field === 'group') {
+      setSelectedStock({ ...stock, logic_group_id: value === '' ? null : value })
+    } else {
+      newFieldValues = { ...stock.field_values, [field]: value }
+      setSelectedStock({ ...stock, field_values: newFieldValues })
+    }
     fetchStocks()
-    // Refresh selected stock
-    const updated = stocks.find(s => s.id === stock.id)
-    if (updated) setSelectedStock({ ...updated })
   }
 
   const cancelInlineEdit = () => {
