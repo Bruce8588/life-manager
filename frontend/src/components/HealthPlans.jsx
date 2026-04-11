@@ -456,6 +456,7 @@ function PlanDetail({ planId, onBack }) {
 
 // 健康方案列表页
 export default function HealthPlans() {
+  const navigate = useNavigate()
   const [plans, setPlans] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [newPlanName, setNewPlanName] = useState('')
